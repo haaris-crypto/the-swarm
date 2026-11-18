@@ -337,15 +337,15 @@ addEventListener('scroll', () => { lastScroll = performance.now(); }, { passive:
 // [film second, weight]: heavier where there is something to read or feel, lighter through the connecting moves,
 // an exponential rush into the Sun, a hard brake on arrival. Linear between points, so the speed never jumps.
 const PACE = [[1.6, 0.9], [4.4, 0.9], [5.4, 0.32], [11.6, 0.32], [12.7, 1.0], [19.5, 1.0], [20.4, 0.28], [25.4, 0.28], [26.4, 0.95], [30.5, 0.95],
-  [31.6, 1.15], [38.5, 1.15], [40, 0.7], [44.5, 0.4], [46.2, 0.32], [49.6, 0.85], [59, 0.85], [60.3, 0.5],
-  ...[62, 63.5, 65, 66.5, 68, 69].map(t => [t, 0.5 * Math.exp(-0.14 * (t - 60.3))]),  // the flight: faster and faster
-  [70, 0.35], [71, 1.1], [79.5, 1.1], [80.6, 0.32], [82.6, 1.0], [91.5, 1.0], [92.6, 0.35], [99, 0.35], [100.2, 0.9], [109, 0.9], [111, 0.3], [117, 0.3]];
+  [31.6, 1.15], [38.5, 1.15], [40, 0.7], [44.5, 0.4], [46.2, 0.32], [49.6, 0.85], [59, 0.85], [60.3, 1.0],
+  ...[62, 63.5, 65, 66.5, 68, 69].map(t => [t, Math.exp(-0.085 * (t - 60.3))]),  // the flight: starts slow, gathers speed, about twice as fast by the end
+  [70, 0.5], [71, 1.1], [79.5, 1.1], [80.6, 0.32], [82.6, 1.0], [91.5, 1.0], [92.6, 0.35], [99, 0.35], [100.2, 0.9], [109, 0.9], [111, 0.3], [117, 0.3]];
 const T0 = 1.6, PACE_N = 4000, paceT = new Float32Array(PACE_N + 1), paceS = new Float32Array(PACE_N + 1);
 { const weight = t => { for (let i = 0; i < PACE.length - 1; i++) { const [a, wa] = PACE[i], [b, wb] = PACE[i + 1]; if (t <= b) return wa + (wb - wa) * clamp((t - a) / (b - a), 0, 1); } return PACE[PACE.length - 1][1]; };
   const T1 = 116.95; let S = 0;
   for (let i = 0; i <= PACE_N; i++) { const t = T0 + (T1 - T0) * i / PACE_N; if (i) S += weight(t) * (T1 - T0) / PACE_N; paceT[i] = t; paceS[i] = S; }
   // the page is as long as the pacing needs: about a fifth of a screen per unit of weight
-  document.getElementById('track').style.height = Math.round(S * 13.5 + 100) + 'vh'; }
+  document.getElementById('track').style.height = Math.round(S * 19 + 100) + 'vh'; }
 function timeAt(f) {                    // scroll fraction -> film second, through the pacing curve
   const S = f * paceS[PACE_N]; let lo = 0, hi = PACE_N;
   while (hi - lo > 1) { const m = (lo + hi) >> 1; if (paceS[m] < S) lo = m; else hi = m; }
