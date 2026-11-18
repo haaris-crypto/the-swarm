@@ -272,7 +272,7 @@ setInterval(setSndLabel, 400);
 
 
 // ---------------------------------------------------------------- the film, scrubbed by the scroll
-const v = document.getElementById('v'), veil = document.getElementById('veil');
+let v = document.getElementById('v'); const veil = document.getElementById('veil');
 const SRC = 'film.mp4', PARTS = [];      // where a host limits file sizes, the film comes in pieces
 let dur = 117, shown = 0, wanted = 0, ready = false, lastP = 0, lastT = performance.now();
 v.addEventListener('loadedmetadata', () => { dur = v.duration || dur; });
@@ -291,12 +291,18 @@ async function pull(url, onBytes) {
       const all = await Promise.all(PARTS.map(p => pull(p.url, n => { got += n; progress(got / total); })));
       chunks = all.flat();
     } else {
-      v.src = SRC;                                   // start from the network while the rest arrives
+      // the film opens as soon as its first frames arrive, streamed from the host; the rest comes down behind it
+      v.src = SRC;
+      v.addEventListener('canplay', () => { ready = true; setTimeout(() => veil.classList.add('gone'), 400); }, { once: true });
       const r = await fetch(SRC, { method: 'HEAD' }); const total = +r.headers.get('content-length') || 0;
       chunks = await pull(SRC, n => { got += n; if (total) progress(got / total); });
     }
-    const url = URL.createObjectURL(new Blob(chunks, { type: 'video/mp4' })); const at = v.currentTime || 0;
-    v.src = url; await new Promise(res => v.addEventListener('loadeddata', res, { once: true })); v.currentTime = at;
+    // swap to the copy in memory without a flicker: a second player takes the same frame, then replaces the first
+    const url = URL.createObjectURL(new Blob(chunks, { type: 'video/mp4' }));
+    const v2 = document.createElement('video'); v2.id = 'v'; v2.muted = true; v2.playsInline = true; v2.preload = 'auto'; v2.src = url;
+    await new Promise(res => v2.addEventListener('loadeddata', res, { once: true }));
+    v2.currentTime = shown; await new Promise(res => v2.addEventListener('seeked', res, { once: true }));
+    v.replaceWith(v2); v.removeAttribute('src'); v.load(); v = v2;
   } catch (e) { if (!v.src) v.src = PARTS.length ? PARTS[0].url : SRC; }
   ready = true; veil.classList.add('gone');
 })();
