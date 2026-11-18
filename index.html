@@ -16,7 +16,20 @@
   #v { width: 100vw; height: 100vh; object-fit: cover; display: block; background: #000; }
   /* on screens narrower than the film, show all of it: the words are part of the picture */
   @media (max-aspect-ratio: 3/2) { #v { object-fit: contain; } }
-  #track { height: 1400vh; }
+  #track { height: 2400vh; }
+  /* the previous frame, laid over the new one and faded out: slow scrolling flows instead of stepping */
+  #ghost { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; opacity: 0; }
+  /* the scroll hint: a mouse with a rolling wheel, or a finger's swipe on touch screens */
+  #hint { position: fixed; left: 50%; bottom: 7vh; transform: translateX(-50%); z-index: 9; text-align: center; pointer-events: none;
+    opacity: 0; transition: opacity .7s ease; }
+  #hint.show { opacity: 1; }
+  #hint .mouse { width: 24px; height: 38px; margin: 0 auto 12px; border: 1.5px solid rgba(241,215,154,.85); border-radius: 13px; position: relative; }
+  #hint .mouse::after { content: ''; position: absolute; left: 50%; top: 7px; width: 3px; height: 7px; margin-left: -1.5px; border-radius: 2px; background: #f1d79a; animation: wheel 1.8s ease-in-out infinite; }
+  @keyframes wheel { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 70% { transform: translateY(12px); opacity: 0; } 100% { opacity: 0; } }
+  #hint .label { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(17px, 1.6vw, 22px); color: #e7dcc3; text-shadow: 0 1px 12px rgba(0,0,0,.8); }
+  #hint .chev { width: 10px; height: 10px; margin: 10px auto 0; border-right: 1.5px solid rgba(241,215,154,.7); border-bottom: 1.5px solid rgba(241,215,154,.7); transform: rotate(45deg); animation: chev 1.8s ease-in-out infinite; }
+  @keyframes chev { 0%,100% { transform: translateY(0) rotate(45deg); opacity: .3; } 50% { transform: translateY(6px) rotate(45deg); opacity: 1; } }
+  @media (pointer: coarse) { #hint .mouse { display: none; } }
   #veil { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: #000; transition: opacity 1.2s ease; }
   #veil.gone { opacity: 0; pointer-events: none; }
   #veil .t { text-align: center; }
@@ -50,7 +63,8 @@
 <div id="stage"><video id="v" muted playsinline preload="auto" disablepictureinpicture></video></div>
 <div id="track"></div>
 <div id="sbar"><div id="sprog"></div></div>
-<div id="scue">Scroll<i></i></div>
+<canvas id="ghost"></canvas>
+<div id="hint"><div class="mouse"></div><div class="label">Scroll to begin</div><div class="chev"></div></div>
 <button id="snd" type="button" aria-label="Sound"><i></i><i></i><i></i><i></i><span>Sound on</span></button>
 <div id="end"><a href="window.html">Walk the window</a></div>
 <div id="veil"><div class="t"><h1>The Swarm</h1><p>A journey to a Dyson Sphere</p><div id="bar"><div id="fill"></div></div><div id="pct">Loading</div></div></div>
@@ -274,7 +288,7 @@ setInterval(setSndLabel, 400);
 // ---------------------------------------------------------------- the film, scrubbed by the scroll
 let v = document.getElementById('v'); const veil = document.getElementById('veil');
 const SRC = 'film.mp4', PARTS = [];      // where a host limits file sizes, the film comes in pieces
-let dur = 117, shown = 0, wanted = 0, ready = false, lastP = 0, lastT = performance.now();
+let dur = 117, shown = 1.6, vel = 0, wanted = 0, ready = false, lastP = 0, lastT = performance.now(), lastScroll = performance.now();
 v.addEventListener('loadedmetadata', () => { dur = v.duration || dur; });
 const progress = f => { document.getElementById('fill').style.width = (f * 100).toFixed(1) + '%'; document.getElementById('pct').textContent = 'Loading ' + Math.round(f * 100) + '%'; };
 // pull the whole film into memory, so every frame is instantly at hand when the scroll asks for it
@@ -306,21 +320,41 @@ async function pull(url, onBytes) {
   } catch (e) { if (!v.src) v.src = PARTS.length ? PARTS[0].url : SRC; }
   ready = true; veil.classList.add('gone');
 })();
+// the blend layer: just before each new frame is asked for, the frame on screen is copied here, then faded away
+const ghost = document.getElementById('ghost'), gx = ghost.getContext('2d', { alpha: true });
+let ghostA = 0;
+function sizeGhost() { const r = Math.min(devicePixelRatio || 1, 1.5); ghost.width = Math.round(innerWidth * r); ghost.height = Math.round(innerHeight * r); }
+sizeGhost(); addEventListener('resize', sizeGhost);
+function holdFrame() {
+  if (!v.videoWidth) return;
+  const W = ghost.width, H = ghost.height, vw = v.videoWidth, vh = v.videoHeight;
+  const cover = (innerWidth / innerHeight) > 1.5, k = cover ? Math.max(W / vw, H / vh) : Math.min(W / vw, H / vh);
+  const dw = vw * k, dh = vh * k;
+  gx.clearRect(0, 0, W, H); gx.drawImage(v, (W - dw) / 2, (H - dh) / 2, dw, dh); ghostA = 0.6;   // a soft blend, never a trail
+}
+addEventListener('scroll', () => { lastScroll = performance.now(); }, { passive: true });
+const touch = matchMedia('(pointer: coarse)').matches, hint = document.getElementById('hint'), hintLabel = hint.querySelector('.label');
 function frame(now) {
   const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
   const max = document.documentElement.scrollHeight - innerHeight;
   const f = max > 0 ? clamp(scrollY / max, 0, 1) : 0;
-  wanted = f * Math.max(0, dur - 0.05);
+  const T0 = 1.6;                                   // open on the lit chapel and the title, not the black before the fade-in
+  wanted = T0 + f * Math.max(0, dur - T0 - 0.05);
   // glide toward the scroll, so a flick of the wheel becomes a smooth camera move
-  shown += (wanted - shown) * (1 - Math.exp(-dt * 7));
-  if (Math.abs(wanted - shown) < 0.004) shown = wanted;
-  if (ready && !v.seeking && Math.abs(v.currentTime - shown) > 1 / 60) v.currentTime = shown;
+  // a critically damped spring: the film eases into motion and settles, like a camera on a dolly
+  const w = 5.5; vel += (w * w * (wanted - shown) - 2 * w * vel) * dt; shown += vel * dt;
+  if (Math.abs(wanted - shown) < 0.002 && Math.abs(vel) < 0.01) { shown = wanted; vel = 0; }
+  if (ready && !v.seeking && Math.abs(v.currentTime - shown) > 1 / 60) { holdFrame(); v.currentTime = shown; }
+  ghostA = Math.max(0, ghostA - dt * 12); ghost.style.opacity = ghostA.toFixed(3);
+  // the hint: at the start, and again whenever the reader stops partway
+  const idle = now - lastScroll > 2600, atStart = f < 0.004, atEnd = f > 0.985;
+  hint.classList.toggle('show', ready && !atEnd && (atStart || (idle && Math.abs(vel) < 0.01)));
+  hintLabel.textContent = atStart ? (touch ? 'Swipe up to begin' : 'Scroll to begin') : (touch ? 'Keep swiping' : 'Keep scrolling');
   const p = filmP(shown);
   music(p);
   if (p >= P_REL0 && lastP < P_REL0) shatter(1, 0, 0.05);            // the glass goes as you scroll through it
   lastP = p;
   document.getElementById('sprog').style.transform = `scaleX(${f.toFixed(4)})`;
-  document.getElementById('scue').style.opacity = String(1 - seg(f, 0.003, 0.03));
   document.getElementById('end').classList.toggle('show', f > 0.985);
   requestAnimationFrame(frame);
 }
