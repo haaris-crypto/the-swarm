@@ -1,0 +1,1326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Swarm — a vision of a Dyson swarm</title>
+<meta name="description" content="From the companies climbing to orbit, to the satellites circling Earth, to a swarm around the Sun.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#ece2cc; --mute:#9d937f; --faint:#6d6555; --gold:#d9b46a; --gold2:#f1d79a;
+  --panel:rgba(13,11,9,.74); --line:rgba(217,180,106,.16);
+  --serif:'Cormorant Garamond',Georgia,'Times New Roman',serif;
+  --sans:'Inter',system-ui,-apple-system,Segoe UI,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#000;overflow:hidden;overscroll-behavior:none;color:var(--ink);font-family:var(--sans)}
+canvas#gl{position:fixed;inset:0;width:100vw;height:100vh;display:block;cursor:default;touch-action:none}
+canvas#gl.pointing{cursor:pointer}
+#veil{position:fixed;inset:0;background:#000;z-index:50;display:flex;align-items:center;justify-content:center;transition:opacity 2.8s ease}
+#veil .t{font-family:var(--serif);font-style:italic;font-size:19px;letter-spacing:.06em;color:#8d8370;opacity:.85}
+#veil.gone{opacity:0;pointer-events:none}
+
+#title{position:fixed;left:38px;top:30px;z-index:5;pointer-events:none;transition:opacity 1.2s}
+#title .eyebrow{font-family:var(--sans);font-size:10.5px;letter-spacing:.32em;text-transform:uppercase;color:var(--mute)}
+#title h1{font-family:var(--serif);font-weight:400;font-size:31px;line-height:1.08;margin:8px 0 6px;letter-spacing:.01em;color:var(--ink);text-shadow:0 2px 24px rgba(0,0,0,.8)}
+#title .sub{font-family:var(--serif);font-style:italic;font-size:16px;color:#b9ad93}
+#tally{margin-top:16px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--mute);display:flex;gap:16px;align-items:center}
+#tally b{font-weight:500;color:var(--gold2);letter-spacing:.06em}
+#sunbar{width:84px;height:2px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
+#sunbar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#8a6a2c,#f1d79a);width:0%;transition:width 1.2s}
+
+#controls{position:fixed;right:30px;top:28px;z-index:6;display:flex;gap:10px}
+.btn{font-family:var(--sans);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink);
+  background:rgba(12,10,8,.55);border:1px solid var(--line);padding:11px 16px;cursor:pointer;-webkit-
+  transition:border-color .3s,background .3s,color .3s}
+.btn:hover{border-color:rgba(217,180,106,.5);color:#fff}
+.btn.on{border-color:rgba(217,180,106,.7);color:var(--gold2);background:rgba(40,30,14,.55)}
+.btn.icon{padding:11px 13px}
+
+#hint{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:5;font-family:var(--serif);font-style:italic;font-size:16px;color:#a99f8a;
+  letter-spacing:.03em;pointer-events:none;transition:opacity 1.6s;text-shadow:0 2px 12px #000;white-space:nowrap}
+#hint span{color:var(--faint);margin:0 10px;font-style:normal}
+
+#tip{position:fixed;z-index:20;pointer-events:none;opacity:0;transition:opacity .25s;transform:translate(16px,16px);
+  background:var(--panel);border:1px solid var(--line);padding:10px 14px 11px;-webkit-min-width:170px}
+#tip .n{font-family:var(--serif);font-size:19px;line-height:1.1}
+#tip .r{font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--mute);margin-top:4px}
+#tip .s{font-size:11px;color:#c8bca2;margin-top:7px;letter-spacing:.04em}
+#tip .s.gold{color:var(--gold2)}
+
+#ledger{position:fixed;top:0;right:0;bottom:0;width:410px;max-width:92vw;z-index:30;background:var(--panel);
+  border-left:1px solid var(--line);-webkit-
+  transform:translateX(102%);transition:transform .7s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+#ledger.open{transform:none}
+#ledger header{padding:30px 30px 14px;border-bottom:1px solid var(--line)}
+#ledger header .k{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--mute)}
+#ledger header h2{font-family:var(--serif);font-weight:400;font-size:28px;margin:6px 0 14px}
+#ledger .close{position:absolute;right:20px;top:22px;background:none;border:none;color:var(--mute);font-size:24px;cursor:pointer;font-family:var(--serif)}
+#ledger .close:hover{color:var(--ink)}
+#search{width:100%;background:rgba(255,255,255,.03);border:1px solid var(--line);color:var(--ink);padding:10px 12px;font-family:var(--serif);font-size:16px;outline:none}
+#search:focus{border-color:rgba(217,180,106,.45)}
+#list{overflow:auto;flex:1;padding:6px 0 30px}
+#list::-webkit-scrollbar{width:6px}#list::-webkit-scrollbar-thumb{background:rgba(217,180,106,.18)}
+.grp{padding:18px 30px 6px}
+.grp .gt{font-family:var(--serif);font-size:19px;color:var(--ink)}
+.grp .gn{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--mute);margin-top:1px}
+.row{display:flex;align-items:center;gap:13px;padding:8px 30px;cursor:pointer;transition:background .2s}
+.row:hover{background:rgba(217,180,106,.06)}
+.sw{width:15px;height:20px;flex:none;border:1.5px solid #2a2724;border-radius:7px 7px 1px 1px;background:transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+.row .nm{font-family:var(--serif);font-size:17px;flex:1;color:#d9cfb8}
+.row.set .nm{color:var(--ink)}
+.row .st{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+.row.set .st{color:var(--mute)}
+.row .st.g{color:var(--gold)}
+#ledger footer{padding:12px 30px 18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+#ledger footer a{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);cursor:pointer;text-decoration:none}
+#ledger footer a:hover{color:var(--mute)}
+
+#card{position:absolute;inset:0;background:rgba(12,10,8,.0);display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .35s}
+#card.show{opacity:1;pointer-events:auto;background:rgba(13,11,9,.98)}
+#card .in{padding:30px 30px 24px;overflow:auto;flex:1}
+#card .back{background:none;border:none;color:var(--mute);font-size:10px;letter-spacing:.24em;text-transform:uppercase;cursor:pointer;padding:0;margin-bottom:22px;font-family:var(--sans)}
+#card .back:hover{color:var(--ink)}
+#card .rg{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--gold)}
+#card h3{font-family:var(--serif);font-weight:400;font-size:36px;line-height:1.05;margin:8px 0 12px}
+#card .desc{font-family:var(--serif);font-size:18px;line-height:1.4;color:#cfc4ab;margin:0 0 12px}
+#card .sz{font-style:normal;color:var(--gold2);font-size:15px;letter-spacing:.02em}
+#card .stat{font-family:var(--serif);font-style:italic;font-size:16px;line-height:1.4;color:var(--mute);margin:0 0 6px}
+.sec{padding:10px 30px 2px;font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--faint)}
+#card .fall{font-family:var(--serif);font-style:italic;font-size:16px;line-height:1.4;color:#d8bf86;border-left:1px solid rgba(217,180,106,.4);padding:2px 0 2px 12px;margin:14px 0 4px}
+.fld{margin-top:24px}
+.fld .lb{display:flex;justify-content:space-between;align-items:baseline}
+.fld .lb span{font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink)}
+.fld .lb em{font-family:var(--serif);font-size:14px;color:var(--mute)}
+.fld .lb output{font-family:var(--serif);font-size:18px;color:var(--gold2);min-width:30px;text-align:right}
+.fld .note{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--faint);margin-top:4px}
+.sub3{margin-top:10px;display:grid;grid-template-columns:72px 1fr 34px;gap:8px 12px;align-items:center}
+.sub3 label{font-family:var(--serif);font-size:16px;color:#cbbfa5}
+.sub3 output{font-family:var(--serif);font-size:16px;color:var(--gold2);text-align:right}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;margin:6px 0 0}
+input[type=range]::-webkit-slider-runnable-track{height:1px;background:linear-gradient(90deg,rgba(217,180,106,.65) var(--p,50%),rgba(255,255,255,.12) var(--p,50%))}
+input[type=range]::-moz-range-track{height:1px;background:rgba(255,255,255,.12)}
+input[type=range]::-moz-range-progress{height:1px;background:rgba(217,180,106,.65)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#f1d79a;margin-top:-6px;box-shadow:0 0 0 4px rgba(217,180,106,.12),0 0 14px rgba(241,215,154,.45);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;border:none;background:#f1d79a;box-shadow:0 0 14px rgba(241,215,154,.45);cursor:pointer}
+.chk{display:flex;gap:12px;align-items:flex-start;margin-top:22px;cursor:pointer;user-select:none}
+.chk .bx{width:16px;height:16px;border:1px solid rgba(217,180,106,.55);flex:none;margin-top:2px;position:relative;transition:background .3s}
+.chk.on .bx{background:linear-gradient(135deg,#f6e2a8,#b58a37);box-shadow:0 0 14px rgba(241,215,154,.5)}
+.chk .tx{font-family:var(--serif);font-size:16px;color:#d8c597;line-height:1.3}
+.chk .tx small{display:block;font-style:italic;color:var(--faint);font-size:14px}
+.pv{display:flex;gap:18px;align-items:center;margin-top:26px;padding-top:20px;border-top:1px solid var(--line)}
+.pane{width:46px;height:62px;border-radius:23px 23px 2px 2px;border:3px solid #1d1b19;box-shadow:0 0 0 1px #3a352c, inset 0 0 12px rgba(0,0,0,.35);flex:none;transition:background .4s, box-shadow .4s}
+.pv .pt{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--mute);line-height:1.35}
+.acts{display:flex;gap:10px;padding:16px 30px 22px;border-top:1px solid var(--line)}
+.acts .btn{flex:1;text-align:center}
+.acts .btn.prime{background:linear-gradient(180deg,rgba(217,180,106,.22),rgba(217,180,106,.08));border-color:rgba(217,180,106,.55);color:var(--gold2)}
+.acts .btn.prime:hover{background:linear-gradient(180deg,rgba(217,180,106,.32),rgba(217,180,106,.12))}
+.acts .btn.ghost{flex:0 0 auto;color:var(--mute)}
+
+#toast{position:fixed;left:50%;top:auto;bottom:70px;transform:translate(-50%,0);z-index:8;text-align:center;pointer-events:none;opacity:0;transition:opacity 2.4s}
+#toast .a{font-family:var(--serif);font-style:italic;font-size:30px;color:#f5e6c0;text-shadow:0 0 30px rgba(0,0,0,.9)}
+#toast .b{font-size:10.5px;letter-spacing:.3em;text-transform:uppercase;color:#cdbf9f;margin-top:10px;text-shadow:0 0 16px #000}
+#nogl{position:fixed;inset:0;display:none;align-items:center;justify-content:center;font-family:var(--serif);font-size:20px;color:var(--mute);text-align:center;padding:40px}
+@media (max-width:760px){#toast{bottom:130px}#title{left:20px;top:20px}#title h1{font-size:23px}#controls{right:14px;top:auto;bottom:70px}#hint{font-size:13px}}
+</style>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="sbar"><div id="sprog"></div></div>
+<div id="brand"><b>The Swarm</b></div>
+<div id="flash"></div>
+<div id="scue">Scroll<i></i></div>
+<button id="snd" type="button" aria-label="Sound"><i></i><i></i><i></i><i></i><span>Sound on</span></button>
+
+<section class="beat right" data-from="0.8" data-to="1.4">
+  <h2><em>16,896</em><br>satellites.</h2>
+  <p>All of them circling Earth.</p>
+</section>
+
+<section class="beat left" data-from="1.95" data-to="2.38">
+  <h2><em>749</em> space companies.</h2>
+  <p>All building for the same small orbit.</p>
+</section>
+
+<section class="beat center impact" data-from="2.48" data-to="3.1">
+  <h2>We're circling<br><em>the wrong thing.</em></h2>
+</section>
+
+<section class="beat left ink" data-from="3.5" data-to="4.1">
+  <h2>Every field. Every sail.<br>Every life. <em>One star.</em></h2>
+</section>
+
+<section class="beat center ink" data-from="4.22" data-to="4.58">
+  <h2><em>Follow the light.</em></h2>
+</section>
+
+<section class="beat sunline" data-from="4.95" data-to="5.68">
+  <div class="top"><p class="lede">The Sun gives off</p></div>
+  <div class="bot"><div class="big"><span class="g">19</span><span class="g">000</span><span class="g">000</span><span class="g">000</span><span class="g">000</span></div><i class="rule"></i><p class="lede">times the power we use on Earth.</p></div>
+</section>
+
+<section class="beat flank mission" data-from="5.95" data-to="6.82">
+  <div class="top"><div class="eyebrow">Our mission</div><h2>Catch it.</h2></div>
+  <div class="bot"><h2><em>All of it.</em></h2></div>
+</section>
+
+<section class="beat low" data-from="7.42" data-to="99" data-hold="1">
+  <div class="inner"><h2>The full power <em>of a star.</em></h2><a class="cta" href="window.html">Walk the window</a></div>
+</section>
+<div id="story"></div>
+
+<div id="veil"><div class="t">Lighting the chapel…</div></div>
+
+<div id="title">
+  <div class="eyebrow">After Pieter Bruegel the Elder</div>
+  <h1>Landscape with the Fall of Icarus</h1>
+  <div class="sub">beneath a rose of every satellite in orbit, painted after Cellarius</div>
+  <div id="tally"><span><b id="tSet">0</b> / <span id="tAll">0</span> set</span><span>satellites <b id="tSat">0</b></span><span>sun <b id="tSun">0%</b></span><div id="sunbar"><i></i></div><span id="tGoldW" style="display:none">gold <b id="tGold">0</b></span></div>
+</div>
+
+<div id="controls">
+  <button class="btn" id="bPreview" title="Imagine the finished window (P)">Imagine it whole</button>
+  <button class="btn" id="bLedger" title="Open the ledger (L)">The Ledger</button>
+  <button class="btn icon" id="bSound" title="Sound">♪</button>
+</div>
+
+<div id="hint">Pinch to walk closer, swipe to look around<span>·</span>hover the leading to see whose glass belongs there<span>·</span>click to study it</div>
+<div id="tip"><div class="n"></div><div class="r"></div><div class="s"></div></div>
+<div id="toast"><div class="a"></div><div class="b"></div></div>
+
+<aside id="ledger" aria-label="Ledger of companies">
+  <button class="close" id="lClose" aria-label="Close">×</button>
+  <header>
+    <div class="k">The Glazier's Ledger</div>
+    <h2 id="lTitle">The panes</h2>
+    <input id="search" placeholder="Find a company…" autocomplete="off">
+  </header>
+  <div id="list"></div>
+  <footer><a id="lReset">Clear the window</a><a id="lExport">Copy my ledger</a></footer>
+  <div id="card">
+    <div class="in">
+      <button class="back" id="cBack">← The ledger</button>
+      <div class="rg" id="cRg"></div>
+      <h3 id="cName"></h3>
+      <p class="desc" id="cDesc"></p>
+      <p class="stat sz" id="cSize"></p>
+      <p class="stat sz" id="cSats"></p>
+      <p class="stat" id="cSt"></p>
+      <p class="fall" id="cFall"></p>
+      <div class="fld">
+        <div class="lb"><span>Knowledge</span><output id="oK">0</output></div>
+        <div class="note">gives the glass its colour — what they make, who pays them, who runs them</div>
+        <input type="range" id="rK" min="0" max="100" value="60">
+      </div>
+      <div class="fld">
+        <div class="lb"><span>Acumen</span><output id="oA">0</output></div>
+        <div class="note">decides how brightly the sun comes through</div>
+        <div class="sub3">
+          <label for="rE">Explain</label><input type="range" id="rE" min="0" max="100" value="50"><output id="oE">50</output>
+          <label for="rP">Price</label><input type="range" id="rP" min="0" max="100" value="50"><output id="oP">50</output>
+          <label for="rD">Predict</label><input type="range" id="rD" min="0" max="100" value="50"><output id="oD">50</output>
+        </div>
+      </div>
+      <div class="chk" id="cGold"><div class="bx"></div><div class="tx">I understand the fall<small>mend this pane with gold</small></div></div>
+      <div class="pv"><div class="pane" id="cPane"></div><div class="pt" id="cPt"></div></div>
+    </div>
+    <div class="acts">
+      <button class="btn ghost" id="cRemove">Lift out</button>
+      <button class="btn prime" id="cSet">Set the glass</button>
+    </div>
+  </div>
+</aside>
+<script src="glass-data.js"></script>
+<script src="rose-data.js"></script>
+<script src="space-data.js"></script>
+<script src="landscape-data.js"></script>
+<div id="nogl">This window needs WebGL 2 to let the light through.<br>Try a recent Chrome, Edge, Firefox or Safari.</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   THE LEDGER — painting regions and the companies that glaze them
+   ===================================================================== */
+/* =====================================================================
+   THE LEDGER: read from glass-data.js (cut from the painting and your CSV)
+   ===================================================================== */
+const D = window.GLASS;
+const GROUPS = D.regions.map(r=>[r.key,r.title,r.note]);
+const CO = D.companies.map((c,i)=>({id:c.n, name:c.n, group:D.regions[c.r].key, sector:c.s, country:c.c, founded:c.f, status:c.st,
+  fall:c.fall?(c.st||'A fall in its history.'):null, dead:c.dead, idx:i,
+  size:{index:c.i, usd:c.u, basis:c.b, asOf:c.a, conf:c.k, note:c.sn}}));
+function sizeLine(c){ const z=c.size; if(!z||z.index==null) return 'Size undisclosed'+(z&&z.note?' — '+z.note:'');
+  return [z.usd, z.basis, z.asOf].filter(Boolean).join(' · ')+(z.conf&&z.conf!=='high'?`  (${z.conf} confidence)`:''); }
+const COI = Object.fromEntries(CO.map(c=>[c.id,c.idx]));
+const GRP = Object.fromEntries(GROUPS.map(g=>[g[0],{title:g[1],note:g[2]}]));
+
+const GW=D.W, GH=D.H, ARCH_R=(800*800+240*240)/(2*240), SUNX=D.sun[0], SUNY=D.sun[1];
+function inWindow(x,y){ if(x<0||x>GW||y>GH) return false; const dx=x-800, dy=y-ARCH_R; return dx*dx+dy*dy<=ARCH_R*ARCH_R; }
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const lerp=(a,b,t)=>a+(b-a)*t, clamp=(x,a,b)=>Math.max(a,Math.min(b,x)), sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+
+// an onload promise rather than img.decode(): decode() never settles while the page is in a background tab
+function loadImg(src){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; if(im.complete&&im.naturalWidth) res(im); }); }
+async function buildWindow(){
+  const N=GW*GH;
+  const bin=atob(D.rle), bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  const runs=new Uint16Array(bytes.buffer), sid=new Uint16Array(N); let p=0;
+  for(let i=0;i<runs.length;i+=2){ sid.fill(runs[i],p,p+runs[i+1]); p+=runs[i+1]; }
+  const shards=[]; const F=D.shards;
+  for(let k=0;k<F.length;k+=8){ const r=mulberry32(4000+k); shards.push({comp:F[k],zone:F[k+1],col:[F[k+2],F[k+3],F[k+4]],cx:F[k+5],cy:F[k+6],area:F[k+7],seed:r()}); }
+  const compOf=new Int32Array(N); for(let i=0;i<N;i++){ const s=sid[i]; compOf[i]= s===65535?-1:shards[s].comp; }
+  // lead: distance to every cut, and to the heavier came around each company's pane
+  const INF=1e10, fA=new Float32Array(N).fill(INF), fZ=new Float32Array(N).fill(INF);
+  for(let y=0;y<GH;y++) for(let x=0;x<GW;x++){ const i=y*GW+x;
+    if(x+1<GW){ if(sid[i]!==sid[i+1]){fA[i]=0;fA[i+1]=0;} if(compOf[i]!==compOf[i+1]){fZ[i]=0;fZ[i+1]=0;} }
+    if(y+1<GH){ const j=i+GW; if(sid[i]!==sid[j]){fA[i]=0;fA[j]=0;} if(compOf[i]!==compOf[j]){fZ[i]=0;fZ[j]=0;} } }
+  edt2d(fA,GW,GH); edt2d(fZ,GW,GH);
+  const lead=new Uint8Array(N*2); for(let i=0;i<N;i++){ lead[i*2]=Math.min(255,Math.sqrt(fA[i])*8); lead[i*2+1]=Math.min(255,Math.sqrt(fZ[i])*8); }
+  // the painter's grisaille: R darkens (trace & matting), G lightens (abraded highlights)
+  const im=await loadImg(D.paint);
+  const cv=document.createElement('canvas'); cv.width=GW; cv.height=GH; const cx=cv.getContext('2d',{willReadFrequently:true}); cx.drawImage(im,0,0);
+  const px=cx.getImageData(0,0,GW,GH).data, paint=new Uint8Array(N*2); for(let i=0;i<N;i++){ paint[i*2]=px[i*4]; paint[i*2+1]=px[i*4+1]; }
+  // enamel tint: the painting's own colour, carried smoothly inside each pane
+  const ti=await loadImg(D.tint);
+  const tc=document.createElement('canvas'); tc.width=ti.width; tc.height=ti.height; const tx=tc.getContext('2d',{willReadFrequently:true}); tx.drawImage(ti,0,0);
+  const tint={w:ti.width,h:ti.height,data:new Uint8Array(tx.getImageData(0,0,ti.width,ti.height).data.buffer)};
+  return {sid,lead,paint,shards,tint};
+}
+let RO=null, ROSE_OFF=0, satN=[], famsOf=[];
+async function buildRose(){
+  const RD=window.ROSE, RS=RD.S, N=RS*RS;
+  const bin=atob(RD.rle), bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  const raw=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer();
+  const runs=new Uint16Array(raw), sid=new Uint16Array(N); let p=0;
+  for(let i=0;i<runs.length;i+=2){ sid.fill(runs[i],p,p+runs[i+1]); p+=runs[i+1]; }
+  const F=RD.pieces, pieces=[];
+  for(let k=0;k<F.length;k+=8){ const fam=F[k], F0=fam>=0?RD.families[fam]:null, r=mulberry32(9000+k);
+    pieces.push({win:1, fam, kind:F[k+1], comp:(F0&&F0.c>=0)?F0.c:-1, zone:255, col:[F[k+2],F[k+3],F[k+4]], cx:F[k+5], cy:F[k+6], area:F[k+7], seed:r()}); }
+  // the came: every cut, a heavier came round each family, and how deep each stone mullion runs
+  const famOf=new Int32Array(N); for(let i=0;i<N;i++){ const s=sid[i]; famOf[i]= s>=65534 ? -1-(s-65534) : (pieces[s].fam>=0?pieces[s].fam:-10-s); }
+  const INF=1e9, fA=new Float32Array(N).fill(INF), fZ=new Float32Array(N).fill(INF), fS=new Float32Array(N);
+  for(let y=0;y<RS;y++) for(let x=0;x<RS;x++){ const i=y*RS+x; if(sid[i]===65534) fS[i]=INF;
+    if(x+1<RS){ if(sid[i]!==sid[i+1]){fA[i]=0;fA[i+1]=0;} if(famOf[i]!==famOf[i+1]){fZ[i]=0;fZ[i+1]=0;} }
+    if(y+1<RS){ const j=i+RS; if(sid[i]!==sid[j]){fA[i]=0;fA[j]=0;} if(famOf[i]!==famOf[j]){fZ[i]=0;fZ[j]=0;} } }
+  chamfer(fA,RS,RS); chamfer(fZ,RS,RS); chamfer(fS,RS,RS);
+  const lead=new Uint8Array(N*4); for(let i=0;i<N;i++){ lead[i*4]=Math.min(255,fA[i]*8); lead[i*4+1]=Math.min(255,fZ[i]*8); lead[i*4+2]=Math.min(255,fS[i]*8); }
+  // every satellite, a glint
+  const gb=atob(RD.glints), gu=new Uint8Array(gb.length); for(let i=0;i<gb.length;i++) gu[i]=gb.charCodeAt(i);
+  const gp=new Uint16Array(gu.buffer), gf=new Float32Array(N);
+  for(let k=0;k<gp.length;k+=2){ const x=gp[k]/16, y=gp[k+1]/16, x0=Math.floor(x-0.5), y0=Math.floor(y-0.5);
+    for(let dy=-1;dy<=2;dy++) for(let dx=-1;dx<=2;dx++){ const X=x0+dx, Y=y0+dy; if(X<0||Y<0||X>=RS||Y>=RS) continue; const d2=(X+0.5-x)**2+(Y+0.5-y)**2; gf[Y*RS+X]+=Math.exp(-d2/1.1); } }
+  const gi=await loadImg(RD.gris), gc=document.createElement('canvas'); gc.width=RS; gc.height=RS; const gx=gc.getContext('2d',{willReadFrequently:true});
+  gx.imageSmoothingQuality='high'; gx.drawImage(gi,0,0,RS,RS); const gpx=gx.getImageData(0,0,RS,RS).data;
+  const glint=new Uint8Array(N*4); for(let i=0;i<N;i++){ glint[i*4]=gpx[i*4]; glint[i*4+1]=gpx[i*4+1]; if(sid[i]<65534) glint[i*4+2]=Math.min(255,gf[i]*255); }
+  const ti=await loadImg(RD.tint), tc=document.createElement('canvas'); tc.width=ti.width; tc.height=ti.height; const tx=tc.getContext('2d',{willReadFrequently:true}); tx.drawImage(ti,0,0);
+  const tint={w:ti.width,h:ti.height,data:new Uint8Array(tx.getImageData(0,0,ti.width,ti.height).data.buffer)};
+  return {S:RS, sid, lead, glint, tint, pieces, data:RD};
+}
+function chamfer(d,w,h){ const D=1.41421356;
+  for(let y=0;y<h;y++){ const r=y*w; for(let x=0;x<w;x++){ const i=r+x; let v=d[i]; if(v===0) continue;
+    if(x>0&&d[i-1]+1<v) v=d[i-1]+1; if(y>0){ const u=i-w; if(d[u]+1<v) v=d[u]+1; if(x>0&&d[u-1]+D<v) v=d[u-1]+D; if(x<w-1&&d[u+1]+D<v) v=d[u+1]+D; } d[i]=v; } }
+  for(let y=h-1;y>=0;y--){ const r=y*w; for(let x=w-1;x>=0;x--){ const i=r+x; let v=d[i]; if(v===0) continue;
+    if(x<w-1&&d[i+1]+1<v) v=d[i+1]+1; if(y<h-1){ const u=i+w; if(d[u]+1<v) v=d[u]+1; if(x<w-1&&d[u+1]+D<v) v=d[u+1]+D; if(x>0&&d[u-1]+D<v) v=d[u-1]+D; } d[i]=v; } } }
+function edt1d(f,n,d,v,z){ let k=0; v[0]=0; z[0]=-1e20; z[1]=1e20;
+  for(let q=1;q<n;q++){ let s=((f[q]+q*q)-(f[v[k]]+v[k]*v[k]))/(2*q-2*v[k]); while(s<=z[k]){ k--; s=((f[q]+q*q)-(f[v[k]]+v[k]*v[k]))/(2*q-2*v[k]); } k++; v[k]=q; z[k]=s; z[k+1]=1e20; }
+  k=0; for(let q=0;q<n;q++){ while(z[k+1]<q) k++; const dq=q-v[k]; d[q]=dq*dq+f[v[k]]; } }
+function edt2d(f,w,h){ const n=Math.max(w,h), d=new Float32Array(n), v=new Int32Array(n), z=new Float32Array(n+1), col=new Float32Array(n);
+  for(let x=0;x<w;x++){ for(let y=0;y<h;y++) col[y]=f[y*w+x]; edt1d(col,h,d,v,z); for(let y=0;y<h;y++) f[y*w+x]=d[y]; }
+  for(let y=0;y<h;y++){ for(let x=0;x<w;x++) col[x]=f[y*w+x]; edt1d(col,w,d,v,z); for(let x=0;x<w;x++) f[y*w+x]=d[x]; } }
+
+/* =====================================================================
+   SHADERS
+   ===================================================================== */
+const HDR=`#version 300 es
+precision highp float; precision highp int; precision highp usampler2D; precision highp sampler3D;
+`;
+const VS_QUAD=`#version 300 es
+layout(location=0) in vec2 aPos; out vec2 vUv; void main(){ vUv=aPos*0.5+0.5; gl_Position=vec4(aPos,0.,1.); }`;
+
+const NOISE=`
+float hash12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+vec2 hash22(vec2 p){ vec3 p3=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973)); p3+=dot(p3,p3.yzx+33.33); return fract((p3.xx+p3.yz)*p3.zy); }
+float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.-2.*f);
+  return mix(mix(hash12(i),hash12(i+vec2(1,0)),u.x), mix(hash12(i+vec2(0,1)),hash12(i+vec2(1,1)),u.x), u.y); }
+float fbm(vec2 p){ float s=0., a=.5; for(int i=0;i<5;i++){ s+=a*vnoise(p); p=p*2.03+vec2(17.1,9.7); a*=.5; } return s; }
+float fbm3(vec2 p){ float s=0., a=.5; for(int i=0;i<3;i++){ s+=a*vnoise(p); p=p*2.07+vec2(5.1,3.7); a*=.5; } return s/0.875; }
+mat2 rot2(float a){ float c=cos(a), s=sin(a); return mat2(c,s,-s,c); }
+`;
+// shared description of the window: shard lookups, lead, iron
+const GLASSLIB=`
+uniform usampler2D uId; uniform sampler2D uLead, uShardCol, uShardState, uShardMeta; uniform int uShardW;
+const vec2 G=vec2(1600.,1100.); const float ARCH_R=1453.3333;
+const float W_ALL=1.75, W_ZONE=2.5, W_OUT=7.5;
+uint idAt(vec2 px){ ivec2 p=ivec2(clamp(px,vec2(0.),G-1.)); return texelFetch(uId,p,0).r; }
+vec4 sfetch(sampler2D t, uint id){ int i=int(id); return texelFetch(t, ivec2(i%uShardW, i/uShardW), 0); }
+float winSD(vec2 uv){ vec2 P=uv*G; float dB=max(max(-P.x,P.x-G.x),P.y-G.y); float dC=length(P-vec2(800.,ARCH_R))-ARCH_R; return max(dB,dC); }
+float leadDist(vec2 uv, out vec2 ld){ ld=texture(uLead,uv).rg*31.875; float d=min(ld.x-W_ALL, ld.y-W_ZONE); return min(d, -winSD(uv)-W_OUT); }
+float barDist(vec2 px){ float d=1e5; d=min(d,abs(px.y-262.)); d=min(d,abs(px.y-492.)); d=min(d,abs(px.y-722.)); d=min(d,abs(px.y-952.));
+  d=min(d,abs(px.x-520.)); d=min(d,abs(px.x-1124.)); return d-3.3; }
+float crackD(vec2 px, float seed){ vec2 p=px/115.+seed*17.31; vec2 n=floor(p), f=fract(p); vec2 mg=vec2(0), mr=vec2(0); float md=8.;
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(i,j); vec2 o=hash22(n+g); vec2 r=g+o-f; float d=dot(r,r); if(d<md){md=d;mr=r;mg=g;} }
+  md=8.; for(int j=-2;j<=2;j++) for(int i=-2;i<=2;i++){ vec2 g=mg+vec2(i,j); vec2 o=hash22(n+g); vec2 r=g+o-f; if(dot(mr-r,mr-r)>1e-5) md=min(md, dot(0.5*(mr+r), normalize(r-mr))); }
+  return md*115.; }
+float crack(vec2 px, float seed, float fw){ vec2 w=vec2(vnoise(px*.045+seed*9.),vnoise(px*.045+seed*9.+5.2))-.5; float d=crackD(px+w*14.,seed); return 1.-smoothstep(0.55,0.55+fw*1.2+0.5,d); }
+`;
+
+const FS_GLASS=HDR+`
+in vec2 vUv; out vec4 o;
+uniform usampler2D uId; uniform sampler2D uLead, uShardCol, uShardState, uShardMeta, uPaint, uTint;
+uniform int uShardW, uIdOff, uRose; uniform vec2 uG; uniform float uTime, uHoleK, uWAll, uWZone;
+uniform vec4 uAnimA[16], uAnimB[16]; uniform int uAnimN;
+`+NOISE+`
+vec4 sfetchI(sampler2D t, int i){ return texelFetch(t, ivec2(i%uShardW, i/uShardW), 0); }
+uint idAt(vec2 px){ return texelFetch(uId, ivec2(clamp(px,vec2(0.),uG-1.)), 0).r; }
+float outlineSD(vec2 px){ if(uRose==1) return length(px-uG*0.5)-1236.; float dB=max(max(-px.x,px.x-uG.x),px.y-uG.y); float dC=length(px-vec2(800.,1453.3333))-1453.3333; return max(dB,dC); }
+float barDist(vec2 px){ float d=1e5; d=min(d,abs(px.y-262.)); d=min(d,abs(px.y-492.)); d=min(d,abs(px.y-722.)); d=min(d,abs(px.y-952.));
+  d=min(d,abs(px.x-520.)); d=min(d,abs(px.x-1124.)); return d-3.3; }
+float crackD(vec2 px, float seed){ vec2 p=px/115.+seed*17.31; vec2 n=floor(p), f=fract(p); vec2 mg=vec2(0), mr=vec2(0); float md=8.;
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(i,j); vec2 o=hash22(n+g); vec2 r=g+o-f; float d=dot(r,r); if(d<md){md=d;mr=r;mg=g;} }
+  md=8.; for(int j=-2;j<=2;j++) for(int i=-2;i<=2;i++){ vec2 g=mg+vec2(i,j); vec2 o=hash22(n+g); vec2 r=g+o-f; if(dot(mr-r,mr-r)>1e-5) md=min(md, dot(0.5*(mr+r), normalize(r-mr))); }
+  return md*115.; }
+float crack(vec2 px, float seed, float fw){ vec2 w=vec2(vnoise(px*.045+seed*9.),vnoise(px*.045+seed*9.+5.2))-.5; float d=crackD(px+w*14.,seed); return 1.-smoothstep(0.55,0.55+fw*1.2+0.5,d); }
+vec3 s2l(vec3 c){ return pow(c, vec3(2.55)); }
+vec3 glassCol(int gid, vec2 px, vec4 st){
+  vec4 sc=sfetchI(uShardCol,gid);
+  float kind=(uRose==1)?floor(sfetchI(uShardMeta,gid).a*255.+0.5):0.;
+  vec3 src;
+  if(uRose==1){ vec3 tc=texture(uTint,px/uG).rgb; float tl=dot(tc,vec3(.2126,.7152,.0722));
+    if(kind>2.5){ src=clamp(mix(sc.rgb,tc,0.18)*(0.8+0.35*tl),0.,1.); float sl=dot(src,vec3(.2126,.7152,.0722)); src=mix(vec3(sl),src,0.78); }   // an orbit ribbon: deep, slightly muted glass
+    else if(kind>1.5) src=sc.rgb;                                                 // Earth
+    else src=clamp(mix(sc.rgb, tc, (kind>0.5)?0.8:0.56)*(0.42+1.05*tl),0.,1.); }
+  else src=mix(sc.rgb, texture(uTint, px/uG).rgb, 0.72);
+  vec3 base=s2l(src); float seed=sc.a;
+  float k=st.g, a=st.b;
+  float lum=dot(base,vec3(.2126,.7152,.0722));
+  vec3 pale=mix(vec3(0.80,0.85,0.78), base/(lum+0.001)*0.82, 0.12);
+  vec3 c=mix(pale, base, smoothstep(0.,1.,k));
+  vec2 q=rot2(seed*6.283)*px;
+  float streak=fbm3(q*vec2(0.010,0.075)+seed*40.);
+  float dens=1.0+(streak-0.5)*1.1*mix(0.4,1.,k);
+  c=pow(max(c,vec3(1e-4)), vec3(dens));
+  vec2 bp=px*0.11+seed*31.; vec2 bi=floor(bp), bf=fract(bp); vec2 bo=hash22(bi); float bd=length(bf-bo*0.8-0.1);
+  c*=1.+0.7*(1.-smoothstep(0.03,0.07,bd))*step(0.82,hash12(bi+3.));
+  if(uRose==1){
+    // painted orbit lines along each ring, and every satellite a glint of clear abraded glass
+    vec4 pr=texture(uPaint,px/uG); float pk=(kind>1.5&&kind<2.5)?0.:1.;
+    c*=1.-pr.r*mix(0.62,0.93,k)*pk;                         // Cellarius's figures, traced and matted in grisaille
+    c*=1.+pr.g*mix(0.3,0.6,k)*pk;
+    float rr=length(px-uG*0.5);
+    c*=1.-0.07*pow(0.5+0.5*cos(rr*6.2832/7.),10.)*pk;
+    if(kind>2.5){   // a glazier's ribbon: matted toward its edges, a luminous core, a traced line inside the lead
+      float e=texture(uLead,px/uG).g*31.875;
+      c*=mix(0.38,1.,smoothstep(1.5,13.,e));
+      c*=0.82+0.32*smoothstep(9.,22.,e);
+      c*=1.-0.6*(1.-smoothstep(0.5,1.3,abs(e-5.)));
+      c*=0.9+0.2*fbm3(px*vec2(0.004,0.02)+seed*7.);   // antique glass: uneven in its depth
+    }
+    float g=pr.b;                                            // every satellite, a glint
+    c=c*(1.+g*mix(1.6,3.4,k))+vec3(1.,0.97,0.9)*g*mix(0.10,0.26,k);
+  } else {
+    vec2 pp=texture(uPaint, px/uG).rg;
+    c*=1.-pp.x*mix(0.70,0.94,k);
+    c*=1.+pp.y*mix(0.3,0.65,k);
+  }
+  float ldx=texture(uLead,px/uG).r*31.875;
+  c*=mix(0.78,1.,smoothstep(1.,11.,ldx));
+  float bright=mix(0.06,1.0,pow(a,0.85));
+  return c*bright;
+}
+vec3 haze(vec2 px){ float n=fbm3(px*0.0035+vec2(uTime*0.01,0.)); return vec3(1.0,0.86,0.63)*uHoleK*(0.75+0.6*n); }
+void main(){
+  vec2 px=vUv*uG;
+  uint id=idAt(px);
+  if(id>=65534u){ o=vec4(0,0,0,1); return; }
+  int gid=int(id)+uIdOff;
+  vec4 st=sfetchI(uShardState,gid);
+  float set=st.r, gold=step(0.5,st.a), flash=clamp((st.a-gold*0.5)/0.49,0.,1.);
+  vec3 col=haze(px);
+  if(set>0.001){ vec3 g=glassCol(gid,px,st)*(1.+flash*2.4); col=mix(col,g,set);
+    if(gold>0.5){ float cr=crack(px, sfetchI(uShardCol,gid).a, 1.); col*=1.-cr*set; } }
+  for(int k=0;k<16;k++){ if(k>=uAnimN) break; vec4 A=uAnimA[k], B=uAnimB[k]; int aid=int(A.x+0.5);
+    vec2 c=A.yz; vec2 q=rot2(-A.w)*(px-c-B.xy)/B.z+c; uint qid=idAt(q);
+    if(qid<65534u && int(qid)+uIdOff==aid){ float e=smoothstep(0.,1.6,texture(uLead,q/uG).r*31.875); vec4 ast=sfetchI(uShardState,aid);
+      vec3 g=glassCol(aid,q,ast)*(1.25+0.5*(1.-B.w)); col=mix(col,g,B.w*e); } }
+  vec2 ld=texture(uLead,vUv).rg*31.875;
+  float m=smoothstep(-0.7,0.7,min(ld.x-uWAll, ld.y-uWZone));
+  if(uRose==0) m*=smoothstep(-0.7,0.7,-outlineSD(px)-7.5)*smoothstep(-0.7,0.7,barDist(px));
+  o=vec4(col*m,1.);
+}`;
+
+const SCENE=`
+uniform vec3 uCamPos, uCamR, uCamU, uCamF; uniform float uTanH, uAspect; uniform vec2 uRes;
+uniform vec3 uL; uniform float uTime; uniform sampler2D uGlass, uGlassR;
+uniform float uSun, uSunView, uSunFloor, uCloud, uSunGlass;
+const float WW=6.0, WH=4.125, ZG=-0.55, SPLAY=1.13, ROOMX=8.0, CEIL=19.0, PI=3.14159265;
+const vec2 WC=vec2(0., 2.1+2.0625);
+const float RRM=3.4, RPX=1236., RS=2560.; const vec2 RC=vec2(0., 10.7);   // the rose: glass radius (m), in texels, texture size, centre
+const vec3 PIL0=vec3(-4.7,0.,6.4), PIL1=vec3(4.7,0.,6.4); const float PR=0.56;
+const vec3 STAND0=vec3(-2.7,0.,3.4), STAND1=vec3(2.7,0.,3.4); const float STR=0.035, STH=1.62;
+vec2 winUV(vec2 xy, float s){ vec2 p=(xy-WC)/s; return vec2(p.x/WW+0.5, 0.5-p.y/WH); }
+float winSDs(vec2 uv){ vec2 P=uv*vec2(1600.,1100.); float dB=max(max(-P.x,P.x-1600.),P.y-1100.); float dC=length(P-vec2(800.,1453.3333))-1453.3333; return max(dB,dC); }
+vec2 roseUV(vec2 xy, float s){ vec2 p=(xy-RC)/s*(RPX/RRM); return vec2(0.5+p.x/RS, 0.5-p.y/RS); }
+float roseSDs(vec2 uv){ return length((uv-0.5)*RS)-RPX; }
+bool inOpening(vec2 xy, float s){ return winSDs(winUV(xy,s))<0. || roseSDs(roseUV(xy,s))<0.; }
+float openG(vec3 q){ float s=mix(SPLAY,1.,clamp(q.z/ZG,0.,1.)); return min(winSDs(winUV(q.xy,s))*s*(WW/1600.), roseSDs(roseUV(q.xy,s))*s*(RRM/RPX)); }
+float rayCyl(vec3 ro, vec3 rd, vec3 c, float r){ vec2 oc=ro.xz-c.xz, d=rd.xz; float a=dot(d,d), b=dot(oc,d), cc=dot(oc,oc)-r*r, h=b*b-a*cc; if(h<0.||a<1e-7) return -1.; return (-b-sqrt(h))/a; }
+struct Hit{ float t; vec3 n; int m; vec3 p; };
+Hit trace(vec3 ro, vec3 rd){
+  Hit h; h.t=1e9; h.m=0; h.n=vec3(0,1,0);
+  if(rd.y<0.){ float t=-ro.y/rd.y; if(t<h.t){ h.t=t; h.n=vec3(0,1,0); h.m=1; } }
+  if(rd.y>0.){ float t=(CEIL-ro.y)/rd.y; if(t<h.t){ h.t=t; h.n=vec3(0,-1,0); h.m=4; } }
+  if(rd.x>0.){ float t=(ROOMX-ro.x)/rd.x; if(t<h.t){ h.t=t; h.n=vec3(-1,0,0); h.m=3; } }
+  if(rd.x<0.){ float t=(-ROOMX-ro.x)/rd.x; if(t<h.t){ h.t=t; h.n=vec3(1,0,0); h.m=3; } }
+  float tc=rayCyl(ro,rd,PIL0,PR); if(tc>0.&&tc<h.t){ h.t=tc; vec3 p=ro+rd*tc; h.n=normalize(vec3(p.x-PIL0.x,0.,p.z-PIL0.z)); h.m=5; }
+  tc=rayCyl(ro,rd,PIL1,PR); if(tc>0.&&tc<h.t){ h.t=tc; vec3 p=ro+rd*tc; h.n=normalize(vec3(p.x-PIL1.x,0.,p.z-PIL1.z)); h.m=5; }
+  // iron candle stands
+  tc=rayCyl(ro,rd,STAND0,STR); if(tc>0.&&tc<h.t&&ro.y+rd.y*tc<STH){ h.t=tc; vec3 p=ro+rd*tc; h.n=normalize(vec3(p.x-STAND0.x,0.,p.z-STAND0.z)); h.m=9; }
+  tc=rayCyl(ro,rd,STAND1,STR); if(tc>0.&&tc<h.t&&ro.y+rd.y*tc<STH){ h.t=tc; vec3 p=ro+rd*tc; h.n=normalize(vec3(p.x-STAND1.x,0.,p.z-STAND1.z)); h.m=9; }
+  if(rd.z<0.){ float t=-ro.z/rd.z; if(t<h.t){ vec3 p=ro+rd*t;
+      if(!inOpening(p.xy,SPLAY)){ h.t=t; h.n=vec3(0,0,1); h.m=2; }
+      else { float tg=(ZG-ro.z)/rd.z; float tl=t; bool hitE=false;
+        for(int i=1;i<=18;i++){ float tt=mix(t,tg,float(i)/18.); if(openG(ro+rd*tt)>0.){ float a0=tl,a1=tt; for(int j=0;j<7;j++){ float mm=(a0+a1)*.5; if(openG(ro+rd*mm)>0.) a1=mm; else a0=mm; } h.t=a1; hitE=true; break; } tl=tt; }
+        if(hitE){ vec3 q=ro+rd*h.t; vec2 e=vec2(0.01,0.); vec3 gr=vec3(openG(q+e.xyy)-openG(q-e.xyy), openG(q+e.yxy)-openG(q-e.yxy), openG(q+e.yyx)-openG(q-e.yyx)); h.n=-normalize(gr+1e-6); h.m=6; }
+        else { h.t=tg; h.n=vec3(0,0,1); vec3 q=ro+rd*tg; h.m=(roseSDs(roseUV(q.xy,1.))<0.)?8:7; } } } }
+  h.p=ro+rd*h.t; return h;
+}
+vec3 glassAt(vec2 xy, float lod){
+  vec2 u=winUV(xy,1.); if(winSDs(u)<0.) return textureLod(uGlass,u,lod).rgb;
+  vec2 r=roseUV(xy,1.); if(roseSDs(r)<0.) return textureLod(uGlassR,r,lod+0.45).rgb*0.62;
+  return vec3(0.);
+}
+vec3 sunThrough(vec3 P, float lod){
+  if(P.z<ZG+0.002) return vec3(0.);
+  float t=(P.z-ZG)/uL.z; vec3 Q=P-uL*t;
+  if(P.z>0.){ vec3 Q0=P-uL*(P.z/uL.z); if(!inOpening(Q0.xy,SPLAY)) return vec3(0.); }
+  return glassAt(Q.xy,lod);
+}
+vec3 winAvg(){ return (textureLod(uGlass,vec2(0.5),12.).rgb*24.+textureLod(uGlassR,vec2(0.5),13.).rgb*1.27*36.)/60.; }
+`;
+
+const FS_MAIN=HDR+`
+in vec2 vUv; out vec4 o;
+uniform float uHover, uHoverAmt, uSel;
+uniform vec4 uCand[20]; uniform int uCandN;
+uniform usampler2D uIdR; uniform sampler2D uLeadR; uniform int uRoseOff;
+`+NOISE+GLASSLIB+SCENE+`
+float pillarShadow(vec3 P){ vec3 d=-uL; float a=rayCyl(P,d,PIL0,PR), b=rayCyl(P,d,PIL1,PR); return (a>0.||b>0.)?0.:1.; }
+vec3 lighting(vec3 P, vec3 N, bool shadow){
+  float sun=uSunFloor*uSun*uCloud;
+  float t=max(0.,(P.z-ZG)/uL.z); float lod=clamp(log2(1.+t*9.),0.,7.);
+  vec3 d=sunThrough(P,lod)*max(0.,dot(N,-uL))*sun; if(shadow) d*=pillarShadow(P);
+  vec3 W=winAvg()*uSun*uCloud;
+  vec3 wc=vec3(WC,ZG); vec3 tw=wc-P; float r2=dot(tw,tw); vec3 dw=tw*inversesqrt(r2); float A=22.;
+  vec3 Ew=W*uSunView*A*max(0.,dot(N,dw))*max(0.,-dw.z)/(PI*r2+A);
+  vec3 pc=vec3(WC.x+uL.x*(WC.y/-uL.y), 0.02, ZG+uL.z*(WC.y/-uL.y)); vec3 tp=pc-P; float rp=dot(tp,tp); vec3 dp=tp*inversesqrt(rp); float Ap=24.;
+  vec3 Eb=W*sun*0.16*Ap*max(0.,dot(N,dp))*max(0.,-dp.y)/(PI*rp+Ap);
+  // the rose: a second, higher source, and its own pool of light far out on the floor
+  vec3 rc=vec3(RC,ZG); vec3 tr=rc-P; float r2r=dot(tr,tr); vec3 dr=tr*inversesqrt(r2r); float Ar=36.;
+  vec3 Er=W*uSunView*Ar*max(0.,dot(N,dr))*max(0.,-dr.z)/(PI*r2r+Ar);
+  vec3 pr=vec3(RC.x+uL.x*(RC.y/-uL.y), 0.02, ZG+uL.z*(RC.y/-uL.y)); vec3 tq=pr-P; float rq=dot(tq,tq); vec3 dq=tq*inversesqrt(rq); float Aq=40.;
+  vec3 Eq=W*sun*0.16*Aq*max(0.,dot(N,dq))*max(0.,-dq.y)/(PI*rq+Aq);
+  vec3 amb=vec3(0.0035,0.0040,0.0052)*(0.4+uSun);
+  vec3 cl=vec3(0.);   // candlelight: warm, close, alive
+  for(int i=0;i<20;i++){ if(i>=uCandN) break; vec3 l=uCand[i].xyz-P; float d2=dot(l,l); cl+=uCand[i].w*max(0.,dot(N,l*inversesqrt(d2)))/(d2+0.05); }
+  return d+Ew+Eb+Er+Eq+amb+cl*vec3(1.0,0.56,0.22);
+}
+vec3 floorAlb(vec2 p, out float gloss){
+  vec2 s=vec2(0.92,0.66); vec2 g=p/s; float row=floor(g.y); g.x+=fract(row*0.37)*1.3;
+  vec2 id=floor(g), f=fract(g); vec2 ed=min(f,1.-f)*s; float e=min(ed.x,ed.y);
+  float h=hash12(id+3.1); float n=fbm(p*3.6+h*7.); float wear=fbm(p*0.55+11.);
+  e+=(vnoise(p*38.)-.5)*0.007;
+  float mortar=1.-smoothstep(0.003,0.016,e);
+  vec3 c=mix(vec3(0.37,0.34,0.30),vec3(0.27,0.26,0.25),h); c=mix(c,c*vec3(1.06,0.98,0.88),hash12(id+9.));
+  c*=0.7+0.55*n; c*=mix(0.72,1.05,smoothstep(0.25,0.75,wear));
+  c=mix(c,vec3(0.05,0.045,0.04),mortar);
+  gloss=(1.-mortar)*mix(0.12,0.55,smoothstep(0.35,0.8,wear))*(0.6+0.4*h);
+  return c;
+}
+vec3 ashlar(vec2 p, float scale){
+  vec2 s=vec2(0.64,0.37)*scale; vec2 g=p/s; float row=floor(g.y); g.x+=fract(row*0.5)+hash12(vec2(row,1.))*0.35;
+  vec2 id=floor(g), f=fract(g); vec2 ed=min(f,1.-f)*s; float e=min(ed.x,ed.y)+(vnoise(p*30.)-.5)*0.006;
+  float mortar=1.-smoothstep(0.004,0.014,e);
+  float h=hash12(id+1.7); vec3 c=mix(vec3(0.34,0.31,0.27),vec3(0.26,0.25,0.24),h);
+  c*=0.72+0.5*fbm(p*3.+h*5.); c*=mix(0.8,1.05,fbm(p*0.4));
+  return mix(c,vec3(0.06,0.055,0.05),mortar);
+}
+const float ARW=5.6, ARS=7.0;
+float archSD(vec2 p){ float ax=abs(p.x); if(p.y<ARS) return ax-ARW; return length(vec2(ax,p.y)-vec2(-ARW,ARS))-2.*ARW; }
+float rollH(float s, float c, float r){ float t=s-c; return sqrt(max(0.,r*r-t*t)); }
+float archProfile(float s){ // the orders of the arch, rolls and hollows stepping back into the wall
+  if(s<0.||s>1.12) return 0.;
+  float h=0.; h=max(h,rollH(s,0.10,0.085)); h=max(h,rollH(s,0.33,0.10)-0.02); h=max(h,rollH(s,0.58,0.09)+0.02); h=max(h,rollH(s,0.83,0.10)+0.05);
+  h=max(h,rollH(s,1.04,0.07)+0.08);   // the hood mould
+  return h+s*0.05;
+}
+vec3 archRelief(vec2 p, inout vec3 N, inout float gilt){
+  float sd=archSD(p);
+  if(sd>1.14) return vec3(-1.);
+  vec2 e=vec2(0.004,0.);
+  if(sd>=0.){
+    float h0=archProfile(sd), hx=archProfile(archSD(p+e.xy)), hy=archProfile(archSD(p+e.yx));
+    N=normalize(vec3(-(hx-h0)/e.x*0.8,-(hy-h0)/e.x*0.8,1.));
+    vec3 c=vec3(0.43,0.40,0.355)*(0.8+0.3*fbm(p*6.));
+    float hollow=1.-smoothstep(0.0,0.03,h0-sd*0.05);
+    c*=mix(1.,0.45,hollow);
+    // capitals at the springing, carved with leaves and gilded
+    if(p.y>ARS-0.42&&p.y<ARS+0.02&&sd<0.98){ float leaf=fbm(p*vec2(9.,14.)); N=normalize(N+vec3((leaf-0.5)*1.6,(fbm(p*11.+3.)-0.5)*1.6,0.)); gilt=smoothstep(0.35,0.6,leaf); c=mix(c,vec3(0.62,0.46,0.2),gilt); }
+    // bases above the floor
+    if(p.y<0.55&&sd<1.){ c*=0.85; N=normalize(vec3(0.,(p.y<0.3?0.6:-0.3),1.)); }
+    return c;
+  }
+  // inside the arch: a carved diaper of quatrefoils behind the windows
+  vec2 q=rot2(0.7853982)*p/0.62; vec2 f=fract(q)-0.5; float dd=min(abs(f.x),abs(f.y));
+  float groove=1.-smoothstep(0.008,0.03,dd*0.62);
+  vec2 g=fract(q+0.5)-0.5; float rose=1.-smoothstep(0.05,0.075,abs(length(g)-0.17));
+  N=normalize(vec3(sign(f)*groove*0.35+g*rose*0.6,1.));
+  vec3 c=vec3(0.40,0.37,0.33)*(0.82+0.3*fbm(p*5.));
+  c*=1.-groove*0.45; c*=1.-rose*0.2;
+  return c;
+}
+// the rose's frame: a ring of 32 carved cusps echoing the lancets, three rolled mouldings, a gilded bead of ball-flowers
+float roseProf(vec2 p){ vec2 q=p-RC; float r=length(q); float s=r-RRM*SPLAY; float ang=atan(q.x,q.y);
+  float cusp=0.16*abs(sin(ang*16.)); float h=0.;
+  if(s<0.2) h=max(h, s<cusp? 0.02 : 0.11-abs(s-0.15)*0.6);
+  h=max(h,rollH(s,0.28,0.07)); h=max(h,rollH(s,0.44,0.075)+0.02); h=max(h,rollH(s,0.6,0.05)+0.05);
+  float bead=length(vec2(fract(ang*48./6.2832)-0.5, (s-0.52)/0.05))*0.05; h=max(h, max(0.,0.03-bead)*2.2+0.04*step(bead,0.03));
+  return h; }
+vec3 roseRelief(vec2 p, float rsd, inout vec3 N, inout float gilt){
+  vec2 e=vec2(0.004,0.); float h0=roseProf(p), hx=roseProf(p+e.xy), hy=roseProf(p+e.yx);
+  N=normalize(vec3(-(hx-h0)/e.x*0.8,-(hy-h0)/e.x*0.8,1.));
+  vec3 c=vec3(0.43,0.40,0.355)*(0.8+0.3*fbm(p*6.));
+  vec2 q=p-RC; float s=length(q)-RRM*SPLAY; float ang=atan(q.x,q.y);
+  float bead=length(vec2(fract(ang*48./6.2832)-0.5, (s-0.52)/0.05));
+  if(bead<0.6){ gilt=1.-smoothstep(0.35,0.6,bead); c=mix(c,vec3(0.62,0.46,0.2),gilt); }
+  if(s<0.2 && s<0.16*abs(sin(ang*16.))) c*=0.55;
+  return c; }
+vec3 wallAlb(vec2 p){
+  { float rsd=roseSDs(roseUV(p,SPLAY))*SPLAY*(RRM/RPX);
+    if(rsd<0.0){ vec2 q=p-RC; float ang=atan(q.x,q.y); vec3 c=vec3(0.40,0.37,0.33)*(0.8+0.35*fbm(p*5.));
+      float seg=6.2832/64.; float joint=abs(fract(ang/seg)-0.5)*seg*length(q); float m=1.-smoothstep(0.004,0.012,joint); c=mix(c,vec3(0.07),m*0.85);
+      float groove=1.-smoothstep(0.,0.02,abs(rsd-0.16)); c*=1.-groove*0.6;
+      float outer=1.-smoothstep(0.,0.015,abs(rsd-0.6)); c=mix(c,vec3(0.06),outer*0.8);
+      return c; } }
+  vec2 uvs=winUV(p,SPLAY); float sd=winSDs(uvs)*(WW*SPLAY/1600.);
+  if(sd<0.46){
+    vec2 P=uvs*vec2(1600.,1100.); vec3 c=vec3(0.40,0.37,0.33)*(0.8+0.35*fbm(p*5.));
+    float joint;
+    if(P.y<250.){ float ang=atan(P.x-800., 1453.3333-P.y); joint=abs(fract(ang/0.034)-0.5)*0.034*9.; }
+    else joint=abs(fract(p.y/0.36)-0.5)*0.36;
+    float m=1.-smoothstep(0.004,0.012,joint); c=mix(c,vec3(0.07),m*0.85);
+    float groove=1.-smoothstep(0.0,0.02,abs(sd-0.12)); c*=1.-groove*0.6;
+    float outer=1.-smoothstep(0.0,0.015,abs(sd-0.46)); c=mix(c,vec3(0.06),outer*0.8);
+    return c;
+  }
+  return ashlar(p,1.);
+}
+vec3 shadeGlass(vec3 P, vec3 rd){
+  vec2 uv=winUV(P.xy,1.); vec2 px=uv*G;
+  float fw=max(length(fwidth(px)),0.5);
+  vec3 T=texture(uGlass,uv).rgb;
+  float hot=1.+1.5*pow(max(0.,dot(rd,-uL)),10.);
+  float sunV=uSunView*uSunGlass*uCloud*hot;
+  float grime=(0.84+0.16*fbm3(px*0.012))*mix(0.82,1.,smoothstep(0.,0.18,1.-uv.y));
+  vec3 col=T*sunV*grime;
+  vec2 ld; float dl=leadDist(uv,ld);
+  float leadM=1.-smoothstep(-fw*0.75,fw*0.75,dl);
+  float barD=barDist(px); float barM=1.-smoothstep(-fw*0.75,fw*0.75,barD);
+  uint id=idAt(px);
+  vec4 st=vec4(0.), sc=vec4(0.), mt=vec4(0.);
+  if(id!=65535u){ st=sfetch(uShardState,id); sc=sfetch(uShardCol,id); mt=sfetch(uShardMeta,id); }
+  float compId=floor(mt.r*255.+0.5)+floor(mt.g*255.+0.5)*256.;
+  float gold=step(0.5,st.a)*smoothstep(0.3,0.9,st.r);
+  vec3 glowNear=textureLod(uGlass,uv,3.2).rgb*sunV;
+  // came surface: rounded, oxidised, catching the floor's coloured light
+  vec2 e=vec2(1.2/G.x,0.), e2=vec2(0.,1.2/G.y);
+  vec2 gdir=vec2(texture(uLead,uv+e).r-texture(uLead,uv-e).r, -(texture(uLead,uv+e2).r-texture(uLead,uv-e2).r));
+  float prof=clamp(ld.x/W_ALL,0.,1.);
+  vec3 N=normalize(vec3(normalize(gdir+1e-6)*prof*1.25,1.));
+  vec3 R=reflect(rd,N); vec3 refl=vec3(0.002);
+  if(R.y<0.){ float tf=-P.y/R.y; vec3 F=P+R*tf; refl=sunThrough(F,4.5)*uSunFloor*uSun*0.3*max(0.,-uL.y)+vec3(0.003); }
+  float fres=0.04+0.96*pow(1.-max(0.,dot(-rd,N)),5.);
+  vec3 leadC=vec3(0.03,0.031,0.034)*(0.6+0.8*fbm3(px*0.3))*(winAvg()*uSun*0.6+0.02) + refl*(0.25+fres) + glowNear*0.045;
+  vec3 goldA=vec3(1.0,0.72,0.30);
+  vec3 goldC=goldA*(refl*2.4+glowNear*0.24+0.012) + goldA*pow(max(0.,dot(R,normalize(vec3(-0.3,-0.4,1.)))),18.)*0.25*uSun;
+  vec3 came=mix(leadC,goldC,gold);
+  // hover: a warm breath along the leading of the pointed company
+  float hov=(compId==uHover && id!=65535u)?uHoverAmt:0.;
+  float sel=(compId==uSel && id!=65535u)?1.:0.;
+  came+=vec3(1.0,0.78,0.45)*(0.10*hov*(0.75+0.25*sin(uTime*3.))+0.06*sel);
+  col*=1.+0.18*hov;
+  col=mix(col,came,leadM);
+  if(gold>0.){ float cr=crack(px,sc.a,fw); col=mix(col,goldC*1.3,cr*gold*(1.-leadM)); }
+  vec3 iron=vec3(0.012,0.011,0.011)+refl*(0.18+fres*0.5)+glowNear*0.02;
+  col=mix(col,iron,barM);
+  return col;
+}
+vec4 sfetchI(sampler2D t, int i){ return texelFetch(t, ivec2(i%uShardW, i/uShardW), 0); }
+vec3 shadeRose(vec3 P, vec3 rd){
+  vec2 uv=roseUV(P.xy,1.); vec2 px=uv*RS;
+  float fw=max(length(fwidth(px)),0.5);
+  float hot=1.+1.5*pow(max(0.,dot(rd,-uL)),10.);
+  float sunV=uSunView*uSunGlass*uCloud*hot;
+  vec4 ld=texture(uLeadR,uv)*31.875;
+  uint id=texelFetch(uIdR, ivec2(clamp(px,vec2(0.),vec2(RS-1.))), 0).r;
+  vec3 glowNear=textureLod(uGlassR,uv,4.).rgb*sunV;
+  if(id>=65534u){  // carved stone tracery, black against the light, its edges lit by the glass beside it
+    vec2 e=vec2(1.5/RS,0.);
+    vec2 g=vec2(texture(uLeadR,uv+e.xy).b-texture(uLeadR,uv-e.xy).b, -(texture(uLeadR,uv+e.yx).b-texture(uLeadR,uv-e.yx).b));
+    float rim=1.-smoothstep(0.,4.5,ld.b);
+    vec3 Nn=normalize(vec3(normalize(g+1e-6)*rim*1.4,1.));
+    vec3 a=vec3(0.38,0.35,0.31)*(0.72+0.45*fbm(px*0.035));
+    return a*(lighting(vec3(P.xy,0.02),Nn,false)*1.4+glowNear*(0.02+0.14*rim)+vec3(0.002));
+  }
+  vec3 col=texture(uGlassR,uv).rgb*sunV*0.72*(0.86+0.14*fbm3(px*0.01));   // a touch below the lancet, so the painting keeps its contrast
+  float dl=min(ld.r-1.5, ld.g-2.3);
+  float leadM=1.-smoothstep(-fw*0.75,fw*0.75,dl);
+  int gid=int(id)+uRoseOff;
+  vec4 st=sfetchI(uShardState,gid), sc=sfetchI(uShardCol,gid), mt=sfetchI(uShardMeta,gid);
+  float compId=floor(mt.r*255.+0.5)+floor(mt.g*255.+0.5)*256.;
+  float gold=step(0.5,st.a)*smoothstep(0.3,0.9,st.r);
+  vec3 leadC=vec3(0.03,0.031,0.034)*(0.6+0.8*fbm3(px*0.3))*(winAvg()*uSun*0.6+0.02)+glowNear*0.05;
+  vec3 goldC=vec3(1.,0.72,0.3)*(glowNear*0.26+0.012);
+  vec3 came=mix(leadC,goldC,gold);
+  float hov=(compId==uHover)?uHoverAmt:0.; float sel=(compId==uSel)?1.:0.;
+  came+=vec3(1.,0.78,0.45)*(0.12*hov*(0.75+0.25*sin(uTime*3.))+0.06*sel);
+  col*=1.+0.2*hov;
+  col=mix(col,came,leadM);
+  if(gold>0.){ float cr=crack(px,sc.a,fw); col=mix(col,goldC*1.3,cr*gold*(1.-leadM)); }
+  return col;
+}
+void main(){
+  vec2 ndc=(gl_FragCoord.xy/uRes)*2.-1.;
+  vec3 rd=normalize(uCamF+ndc.x*uTanH*uAspect*uCamR+ndc.y*uTanH*uCamU);
+  Hit h=trace(uCamPos,rd);
+  vec3 col=vec3(0.);
+  vec3 P=h.p, N=h.n;
+  if(h.m==7){ col=shadeGlass(P,rd); }
+  else if(h.m==8){ col=shadeRose(P,rd); }
+  else if(h.m==1){ float gloss; vec3 a=floorAlb(P.xz,gloss);
+    float ao=mix(0.45,1.,smoothstep(0.,1.6,P.z))*mix(0.55,1.,smoothstep(0.,2.2,ROOMX-abs(P.x)));
+    ao*=mix(0.35,1.,smoothstep(PR,PR+0.9,length(P.xz-PIL0.xz)))*mix(0.35,1.,smoothstep(PR,PR+0.9,length(P.xz-PIL1.xz)));
+    col=a*lighting(P,N,true)*ao;
+    vec3 R=reflect(rd,N); if(R.z<0.){ float tz=(ZG-P.z)/R.z; vec3 Q=P+R*tz; vec3 Q0=P+R*(-P.z/R.z);
+      if(inOpening(Q0.xy,SPLAY)){ float fr=0.04+0.96*pow(1.-max(0.,dot(-rd,N)),5.); col+=glassAt(Q.xy,2.+(1.-gloss)*5.)*uSunView*uSun*uCloud*fr*gloss*0.9; } } }
+  else if(h.m==2){ vec3 a=wallAlb(P.xy); float ao=mix(0.5,1.,smoothstep(0.,1.4,P.y))*mix(0.6,1.,smoothstep(0.,1.5,ROOMX-abs(P.x)));
+    // window mouldings come first; then the great arch and its tympanum; then plain ashlar
+    float rsd=roseSDs(roseUV(P.xy,SPLAY))*SPLAY*(RRM/RPX), wsd=winSDs(winUV(P.xy,SPLAY))*(WW*SPLAY/1600.);
+    float gilt=0.;
+    if(rsd<0.66){ a=roseRelief(P.xy,rsd,N,gilt); }
+    else if(wsd>=0.46){ vec3 Nr=N; vec3 ar=archRelief(P.xy,Nr,gilt); if(ar.x>=0.){ a=ar; N=Nr; } }
+    col=a*lighting(P,N,false)*ao;
+    if(gilt>0.){ vec3 R=reflect(rd,N); col+=vec3(1.,0.74,0.33)*gilt*(glassAt(P.xy+R.xy*2.,5.)*0.0+winAvg()*uSun*uSunView*0.35*pow(max(0.,0.5+0.5*R.y),3.)+0.004); } }
+  else if(h.m==3){ vec3 a=ashlar(vec2(P.z,P.y),1.)*0.9; float ao=mix(0.5,1.,smoothstep(0.,1.4,P.y))*mix(0.6,1.,smoothstep(0.,1.5,P.z)); col=a*lighting(P,N,false)*ao; }
+  else if(h.m==9){ col=vec3(0.02,0.018,0.016)*lighting(P,N,false)*1.5+vec3(0.002); }
+  else if(h.m==4){ col=vec3(0.18,0.17,0.16)*(0.7+0.4*fbm(P.xz*0.5))*lighting(P,N,false); }
+  else if(h.m==5){ vec3 c=(P.x<0.)?PIL0:PIL1; float ang=atan(P.z-c.z,P.x-c.x); vec2 q=vec2(ang*PR,P.y);
+    float joint=abs(fract(P.y/0.42)-0.5)*0.42; float m=1.-smoothstep(0.003,0.012,joint);
+    vec3 a=vec3(0.33,0.30,0.27)*(0.75+0.45*fbm(q*3.+c.x)); a=mix(a,vec3(0.06),m*0.8);
+    float ao=mix(0.45,1.,smoothstep(0.,1.0,P.y)); col=a*lighting(P,N,false)*ao; }
+  else if(h.m==6){ vec2 pp=vec2(P.x+P.z,P.y+P.z*0.7); vec3 a=vec3(0.42,0.39,0.35)*(0.75+0.4*fbm(pp*4.)); float j=abs(fract(P.y/0.36)-0.5)*0.36; a*=1.-0.6*(1.-smoothstep(0.004,0.01,j));
+    col=a*(lighting(P,N,false)+winAvg()*uSun*uCloud*uSunView*0.06); }
+  // candle flames, drawn where the eye meets them
+  for(int i=0;i<20;i++){ if(i>=uCandN) break; vec3 v=uCand[i].xyz+vec3(0.,0.035,0.)-uCamPos; float tc=dot(v,rd); if(tc<0.||tc>h.t) continue;
+    vec3 q=v-rd*tc; vec3 qq=vec3(q.x,q.y*0.42,q.z); float d2=dot(qq,qq)/(tc*tc)*1e4;
+    col+=vec3(1.,0.62,0.25)*uCand[i].w*(38.*exp(-d2*9.)+1.6*exp(-d2*0.6)+0.25*exp(-d2*0.06)); }
+  o=vec4(col,1.);
+}`;
+
+const FS_VOL=HDR+`
+in vec2 vUv; out vec4 o;
+uniform sampler3D uNoise; uniform sampler2D uPrev; uniform float uVolDen, uFrame, uBlend;
+`+NOISE+SCENE+`
+float dens(vec3 p){
+  float n=texture(uNoise,p*0.21+vec3(uTime*0.011,uTime*0.004,-uTime*0.007)).r;
+  float n2=texture(uNoise,p*0.75+vec3(-uTime*0.02,uTime*0.013,uTime*0.01)).r;
+  float d=0.45+1.25*smoothstep(0.3,0.78,n); d*=0.65+0.7*n2;
+  return d*mix(1.25,0.7,clamp(p.y/14.,0.,1.))*mix(1.,0.18,smoothstep(4.5,10.5,p.y))*mix(0.06,1.,smoothstep(0.5,6.,p.z));
+}
+void main(){
+  vec2 ndc=(gl_FragCoord.xy/uRes)*2.-1.;
+  vec3 rd=normalize(uCamF+ndc.x*uTanH*uAspect*uCamR+ndc.y*uTanH*uCamU), ro=uCamPos;
+  Hit h=trace(ro,rd); float tEnd=h.t;
+  vec3 bmin=vec3(-7.,0.,ZG), bmax=vec3(6.,15.,17.);
+  vec3 inv=1./rd; vec3 t0=(bmin-ro)*inv, t1=(bmax-ro)*inv; vec3 tmn=min(t0,t1), tmx=max(t0,t1);
+  float ta=max(max(tmn.x,tmn.y),max(tmn.z,0.)), tb=min(min(tmx.x,tmx.y),min(tmx.z,tEnd));
+  vec3 acc=vec3(0.);
+  float ign=fract(52.9829189*fract(dot(gl_FragCoord.xy+uFrame*vec2(5.588,3.1),vec2(0.06711056,0.00583715))));
+  if(tb>ta){ const int NS=60; float dt=(tb-ta)/float(NS);
+    for(int i=0;i<NS;i++){ float tt=ta+(float(i)+ign)*dt; vec3 P=ro+rd*tt; vec3 s=sunThrough(P,2.8); if(s.r+s.g+s.b>1e-5) acc+=s*dens(P)*dt*smoothstep(0.6,4.0,tt); } }
+  float c=dot(uL,-rd); float g=0.45; float hg=(1.-g*g)/(4.*PI*pow(1.+g*g-2.*g*c,1.5));
+  float phase=hg*0.8+0.2/(4.*PI);
+  vec3 col=acc*phase*uSunFloor*uSun*uCloud*uVolDen;
+  col+=winAvg()*uSun*uCloud*uSunView*min(tEnd,25.)*0.0006*uVolDen; // the room's own haze
+  vec3 prev=texture(uPrev,vUv).rgb;
+  o=vec4(mix(prev,col,uBlend),1.);
+}`;
+
+const VS_MOTES=HDR+`
+layout(location=0) in vec4 aSeed; out vec3 vCol; out float vA;
+uniform float uPx;
+`+SCENE+`
+void main(){
+  vec3 b0=vec3(-6.5,0.05,-0.4), bs=vec3(13.,14.5,16.);
+  vec3 p=b0+aSeed.xyz*bs;
+  float w=aSeed.w;
+  p.y=b0.y+mod(p.y-b0.y+uTime*(0.006+0.012*w)*(fract(w*7.)>0.5?1.:-0.6),bs.y);
+  p.x=b0.x+mod(p.x-b0.x+uTime*0.01*(w-0.5),bs.x);
+  p+=0.16*vec3(sin(uTime*0.21*(0.6+w)+w*40.),sin(uTime*0.17*(0.5+w)+w*91.),sin(uTime*0.19*(0.7+w)+w*13.));
+  vec3 L=sunThrough(p,1.6);
+  float tw=0.25+0.75*pow(0.5+0.5*sin(uTime*(1.5+w*4.)+w*300.),6.);
+  vec3 v=p-uCamPos; float z=dot(v,uCamF);
+  if(z<0.2||dot(L,vec3(1.))<1e-4){ gl_Position=vec4(2.,2.,2.,1.); gl_PointSize=0.; vA=0.; return; }
+  float x=dot(v,uCamR)/(z*uTanH*uAspect), y=dot(v,uCamU)/(z*uTanH);
+  gl_Position=vec4(x,y,0.,1.);
+  float focus=abs(z-7.5); float sz=uPx*(1.2+focus*focus*0.09)+ (z<3.?(3.-z)*6.*uPx:0.);
+  gl_PointSize=clamp(sz,1.,48.);
+  vA=tw*uSun*uCloud/(gl_PointSize*gl_PointSize)*(1.2+aSeed.x*0.8)*3.2;
+  vCol=L*uSunFloor;
+}`;
+const FS_MOTES=HDR+`
+in vec3 vCol; in float vA; out vec4 o;
+void main(){ vec2 d=gl_PointCoord-0.5; float r=dot(d,d)*4.; float a=exp(-r*3.2)*(1.-smoothstep(0.85,1.,r)); o=vec4(vCol*vA*a,1.); }`;
+
+const FS_DOWN=HDR+`
+in vec2 vUv; out vec4 o; uniform sampler2D uSrc, uVol; uniform vec2 uTexel; uniform int uFirst;
+vec3 s(vec2 uv){ vec3 c=texture(uSrc,uv).rgb; if(uFirst==1){ c+=texture(uVol,uv).rgb; c=min(c,vec3(40.)); } return c; }
+void main(){ vec2 t=uTexel;
+  vec3 a=s(vUv+t*vec2(-2,2)), b=s(vUv+t*vec2(0,2)), c=s(vUv+t*vec2(2,2));
+  vec3 d=s(vUv+t*vec2(-2,0)), e=s(vUv), f=s(vUv+t*vec2(2,0));
+  vec3 g=s(vUv+t*vec2(-2,-2)), h=s(vUv+t*vec2(0,-2)), i=s(vUv+t*vec2(2,-2));
+  vec3 j=s(vUv+t*vec2(-1,1)), k=s(vUv+t*vec2(1,1)), l=s(vUv+t*vec2(-1,-1)), m=s(vUv+t*vec2(1,-1));
+  vec3 r=e*0.125+(a+c+g+i)*0.03125+(b+d+f+h)*0.0625+(j+k+l+m)*0.125;
+  o=vec4(r,1.); }`;
+const FS_UP=HDR+`
+in vec2 vUv; out vec4 o; uniform sampler2D uSrc; uniform vec2 uTexel; uniform float uRadius;
+void main(){ vec2 t=uTexel*uRadius;
+  vec3 r=texture(uSrc,vUv).rgb*4.;
+  r+=(texture(uSrc,vUv+t*vec2(-1,0)).rgb+texture(uSrc,vUv+t*vec2(1,0)).rgb+texture(uSrc,vUv+t*vec2(0,1)).rgb+texture(uSrc,vUv+t*vec2(0,-1)).rgb)*2.;
+  r+=texture(uSrc,vUv+t*vec2(-1,-1)).rgb+texture(uSrc,vUv+t*vec2(1,-1)).rgb+texture(uSrc,vUv+t*vec2(-1,1)).rgb+texture(uSrc,vUv+t*vec2(1,1)).rgb;
+  o=vec4(r/16.,1.); }`;
+const FS_FINAL=HDR+`
+in vec2 vUv; out vec4 o;
+uniform sampler2D uScene, uVol, uBloom; uniform vec2 uRes, uVolTexel; uniform float uExposure, uBloomMix, uTime, uBlaze;
+vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.); }
+float h12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+void main(){
+  vec2 uv=vUv; vec2 cc=uv-0.5;
+  vec3 sc;
+  float ca=dot(cc,cc)*0.0035;
+  sc.r=texture(uScene,uv-cc*ca).r; sc.g=texture(uScene,uv).g; sc.b=texture(uScene,uv+cc*ca).b;
+  vec2 t=uVolTexel;
+  vec3 v=texture(uVol,uv).rgb*0.4+(texture(uVol,uv+t*vec2(1.2,0.4)).rgb+texture(uVol,uv-t*vec2(1.2,0.4)).rgb+texture(uVol,uv+t*vec2(-0.4,1.2)).rgb+texture(uVol,uv-t*vec2(-0.4,1.2)).rgb)*0.15;
+  vec3 c=sc+v;
+  vec3 bl=texture(uBloom,uv).rgb/6.;
+  c=mix(c,bl,uBloomMix);
+  c*=uExposure;
+  // hue-preserving shoulder blended with filmic: glass keeps its colour, the blaze still burns white
+  float mx=max(max(c.r,c.g),c.b); vec3 hp=c*((mx/(1.+mx))/max(mx,1e-5));
+  vec3 fl=aces(c*0.9);
+  c=mix(hp*1.1,fl,0.28+0.2*uBlaze);
+  // grade: cool shadows, warm light
+  float l=dot(c,vec3(.2126,.7152,.0722));
+  c=mix(c*vec3(0.92,0.97,1.08),c*vec3(1.05,1.0,0.92),smoothstep(0.05,0.5,l));
+  c=mix(vec3(l),c,1.06);
+  float vig=1.-smoothstep(0.35,1.05,length(cc*vec2(uRes.x/uRes.y,1.)*0.92)); c*=mix(0.42,1.,vig);
+  c=pow(max(c,0.),vec3(1./2.2));
+  c+=(h12(gl_FragCoord.xy+fract(uTime*7.)*91.)-0.5)*0.022;
+  o=vec4(c,1.);
+}`;
+
+/* =====================================================================
+   GL PLUMBING
+   ===================================================================== */
+const canvas=document.getElementById('gl');
+const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,depth:false,stencil:false,premultipliedAlpha:false,powerPreference:'high-performance'});
+if(!gl){ document.getElementById('nogl').style.display='flex'; document.getElementById('veil').classList.add('gone'); throw new Error('no webgl2'); }
+const extCBF=gl.getExtension('EXT_color_buffer_float')||gl.getExtension('EXT_color_buffer_half_float');
+gl.getExtension('OES_texture_float_linear');
+const HF = !!extCBF;
+const FMT = HF ? {i:gl.RGBA16F,f:gl.RGBA,t:gl.HALF_FLOAT} : {i:gl.RGBA8,f:gl.RGBA,t:gl.UNSIGNED_BYTE};
+
+function compile(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ const log=gl.getShaderInfoLog(s); console.error(log, src.split('\n').map((l,i)=>(i+1)+': '+l).join('\n')); throw new Error(log); } return s; }
+function program(vs,fs){ const p=gl.createProgram(); gl.attachShader(p,compile(gl.VERTEX_SHADER,vs)); gl.attachShader(p,compile(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u={}; const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS); for(let i=0;i<n;i++){ const info=gl.getActiveUniform(p,i); const name=info.name.replace(/\[0\]$/,''); u[name]=gl.getUniformLocation(p,info.name); }
+  return {p,u}; }
+function tex2D(w,h,ifmt,fmt,type,data,filter,wrap,mips){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
+  gl.texImage2D(gl.TEXTURE_2D,0,ifmt,w,h,0,fmt,type,data);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,mips?gl.LINEAR_MIPMAP_LINEAR:filter); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,filter);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,wrap); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,wrap); return t; }
+function fbo(w,h,mips){ const t=tex2D(w,h,FMT.i,FMT.f,FMT.t,null,gl.LINEAR,gl.CLAMP_TO_EDGE,mips); const f=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,f); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0); gl.bindFramebuffer(gl.FRAMEBUFFER,null); return {t,f,w,h}; }
+function freeFbo(o){ if(!o) return; gl.deleteTexture(o.t); gl.deleteFramebuffer(o.f); }
+function bindT(unit,t,target=gl.TEXTURE_2D){ gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(target,t); }
+
+const quad=gl.createVertexArray(); gl.bindVertexArray(quad); { const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0); }
+const MOTES=12000;
+const motesVao=gl.createVertexArray(); gl.bindVertexArray(motesVao); { const r=mulberry32(5); const a=new Float32Array(MOTES*4); for(let i=0;i<a.length;i++) a[i]=r(); const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,a,gl.STATIC_DRAW); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,4,gl.FLOAT,false,0,0); }
+gl.bindVertexArray(null);
+function drawQuad(){ gl.bindVertexArray(quad); gl.drawArrays(gl.TRIANGLES,0,3); }
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+const STORE='icarus-in-glass-v2';
+let saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){ saved=null; }
+if(!saved){ saved={}; try{ const old=JSON.parse(localStorage.getItem('icarus-in-glass-v1')||'{}'); const key=n=>n.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const byKey=Object.fromEntries(CO.map(c=>[key(c.name),c.id])); for(const k in old){ if(byKey[k]) saved[byKey[k]]=old[k]; } }catch(e){} }
+function persist(){ try{ localStorage.setItem(STORE,JSON.stringify(saved)); }catch(e){} }
+const acumenOf=r=>r?(r.ex+r.pr+r.pd)/300:0;
+
+let W=null, S=0, SHW=64, SHH=1, P={}, T={};
+let roseTintTex, idTexR, leadTexR, glintTexR, glassRF, glassDirtyL=true, glassDirtyR=true, lastRoseClink=0;
+let tintTex, stateData, stateTex, colTex, metaTex, idTex, leadTex, paintTex, noiseTex;
+let glassF, sceneF, volA, volB, bloomL=[];
+const companyShards=CO.map(()=>[]); const companyC=CO.map(()=>[0,0]);
+// per-shard live values
+let cur, tgt;
+const anims=[]; const queue=[];
+let preview=false, previewT0=0;
+
+function initState(){
+  S=W.shards.length; SHH=Math.ceil(S/SHW);
+  W.shards.forEach((s,i)=>{ if(s.comp<0) return; companyShards[s.comp].push(i); if(s.win===0){ companyC[s.comp][0]+=s.cx*s.area; companyC[s.comp][1]+=s.cy*s.area; } });
+  CO.forEach((c,i)=>{ const a=companyShards[i].filter(k=>W.shards[k].win===0).reduce((m,k)=>m+W.shards[k].area,0)||1; companyC[i][0]/=a; companyC[i][1]/=a; if(!companyShards[i].length) console.warn('company without glass',c.id); });
+  satN=CO.map(()=>0); famsOf=CO.map(()=>[]); RO.data.families.forEach((f,j)=>{ if(f.c>=0){ satN[f.c]+=f.n; famsOf[f.c].push(j); } });
+  cur={set:new Float32Array(S),k:new Float32Array(S),a:new Float32Array(S),gold:new Uint8Array(S),flash:new Float32Array(S),hold:new Uint8Array(S),start:new Float32Array(S),fl:new Uint8Array(S)};
+  tgt={set:new Float32Array(S),k:new Float32Array(S),a:new Float32Array(S),gold:new Uint8Array(S)};
+  stateData=new Uint8Array(SHW*SHH*4);
+  CO.forEach((c,ci)=>{ const r=saved[c.id]; if(r&&r.set){ for(const s of companyShards[ci]){ cur.set[s]=tgt.set[s]=1; cur.k[s]=tgt.k[s]=r.k/100; cur.a[s]=tgt.a[s]=acumenOf(r); cur.gold[s]=tgt.gold[s]=(r.gold&&c.fall)?1:0; } } });
+  // the commons (government, science, unlisted operators) are already glazed in pale grisaille; Earth in full colour
+  W.shards.forEach((s,i)=>{ if(s.kind===2){ cur.set[i]=tgt.set[i]=1; cur.k[i]=tgt.k[i]=1; cur.a[i]=tgt.a[i]=0.92; }
+    else if(s.kind===1){ cur.set[i]=tgt.set[i]=1; cur.k[i]=tgt.k[i]=0.85; cur.a[i]=tgt.a[i]=0.46; commonsIdx.push(i); } });
+}
+function applyTargets(ci, rec, opts={}){
+  const c=CO[ci]; const sh=companyShards[ci];
+  const on=!!(rec&&rec.set);
+  for(const s of sh){ tgt.k[s]=on?rec.k/100:tgt.k[s]; tgt.a[s]=on?acumenOf(rec):tgt.a[s]; tgt.gold[s]=on&&rec.gold&&c.fall?1:0; tgt.set[s]=on?1:0; }
+  if(opts.fly && on){
+    // the glazier sets each piece in turn, from the heart of the company outward
+    const order=sh.slice().sort((a,b)=>{ const A=W.shards[a],B=W.shards[b]; return (A.cy-B.cy)*0.6+(Math.hypot(A.cx-companyC[ci][0],A.cy-companyC[ci][1])-Math.hypot(B.cx-companyC[ci][0],B.cy-companyC[ci][1])); });
+    const lan=order.filter(s=>W.shards[s].win===0), ros=order.filter(s=>W.shards[s].win===1);
+    const now=clock; lan.forEach((s,i)=>{ if(cur.set[s]>0.99) return; cur.hold[s]=1; cur.k[s]=tgt.k[s]; cur.a[s]=tgt.a[s]; queue.push({s,at:now+0.35+i*Math.max(0.09,0.5/Math.sqrt(lan.length))}); });
+    // in the rose, light runs outward from Earth through every pane of that company's satellites
+    ros.forEach(s=>{ if(cur.set[s]>0.99) return; const q=W.shards[s], r=Math.hypot(q.cx-1280,q.cy-1280)/1236; cur.k[s]=tgt.k[s]; cur.a[s]=tgt.a[s]; cur.start[s]=now+1.0+r*2.6+mulberry32(s)()*0.35; cur.fl[s]=1; });
+  }
+}
+function previewOn(){
+  preview=true; previewT0=clock;
+  for(let s=0;s<S;s++){ const sh=W.shards[s]; if(sh.kind===1||sh.kind===2||sh.comp<0) continue; const c=CO[sh.comp];
+    const d= sh.win===0 ? Math.pow(Math.hypot(sh.cx-SUNX,(sh.cy-SUNY)*1.2)/1500,0.85)*9 : 1.2+Math.hypot(sh.cx-1280,sh.cy-1280)/1236*8;
+    tgt.set[s]=1; tgt.k[s]=1; tgt.a[s]=1; tgt.gold[s]=c.fall?1:0;
+    if(cur.set[s]<0.99){ cur.start[s]=clock+0.4+d+(mulberry32(s)()*0.6); cur.fl[s]=1; cur.k[s]=1; cur.a[s]=1; }
+    else { cur.start[s]=clock; } cur.hold[s]=0; }
+  anims.length=0; queue.length=0;
+}
+function previewOff(){ preview=false; for(let s=0;s<S;s++){ cur.start[s]=clock; cur.hold[s]=0; cur.fl[s]=0; } anims.length=0; queue.length=0;
+  CO.forEach((c,ci)=>{ const r=saved[c.id]; for(const s of companyShards[ci]){ const on=!!(r&&r.set); tgt.set[s]=on?1:0; if(on){ tgt.k[s]=r.k/100; tgt.a[s]=acumenOf(r); tgt.gold[s]=(r.gold&&c.fall)?1:0; } else { tgt.gold[s]=0; } } }); }
+
+/* =====================================================================
+   SOUND — a glazier's tap
+   ===================================================================== */
+let actx=null, soundOn=true;
+function audio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(actx&&actx.state==='suspended') actx.resume(); return actx; }
+function clink(size,pan){ if(!soundOn) return; const ac=audio(); if(!ac) return; const t=ac.currentTime+0.01;
+  const out=ac.createGain(); out.gain.value=0.07; let node=out; if(ac.createStereoPanner){ const p=ac.createStereoPanner(); p.pan.value=clamp(pan,-0.8,0.8); out.connect(p); p.connect(ac.destination); } else out.connect(ac.destination);
+  const base=lerp(2300,1050,clamp(Math.sqrt(size)/110,0,1))*(0.97+Math.random()*0.06);
+  [[1,1,1.3],[2.76,0.45,0.7],[5.4,0.22,0.38],[8.93,0.1,0.2]].forEach(([r,a,d])=>{ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=base*r; const g=ac.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(a,t+0.003); g.gain.exponentialRampToValueAtTime(0.0001,t+d); o.connect(g); g.connect(node); o.start(t); o.stop(t+d+0.05); });
+  const len=Math.floor(ac.sampleRate*0.05), buf=ac.createBuffer(1,len,ac.sampleRate), ch=buf.getChannelData(0); for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+  const src=ac.createBufferSource(); src.buffer=buf; const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=420; const g=ac.createGain(); g.gain.value=0.9; src.connect(lp); lp.connect(g); g.connect(node); src.start(t); }
+function chord(){ if(!soundOn) return; const ac=audio(); if(!ac) return; const t=ac.currentTime+0.05; const out=ac.createGain(); out.gain.value=0.05; out.connect(ac.destination);
+  [261.6,329.6,392,523.3,659.3,784].forEach((f,i)=>{ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f; const g=ac.createGain(); g.gain.setValueAtTime(0,t+i*0.18); g.gain.linearRampToValueAtTime(0.5,t+i*0.18+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+i*0.18+5); o.connect(g); g.connect(out); o.start(t+i*0.18); o.stop(t+i*0.18+5.2); }); }
+
+/* =====================================================================
+   CAMERA
+   ===================================================================== */
+const cam={d:-0.55, dT:0, yaw:0, yawT:0, pitch:0, pitchT:0, px:0, py:0, pxT:0, pyT:0, mx:0, my:0, sx:0, sy:0, pos:[0,0,0], R:[1,0,0], U:[0,1,0], F:[0,0,-1], tanH:0.5, aspect:1};
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], norm=a=>{const l=Math.hypot(...a);return[a[0]/l,a[1]/l,a[2]/l];}, cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const ZMAX=1.45; let zoomActive=-1e9; const held={};
+const RCY=10.7;
+cam.fx=0; cam.fy=6.4; cam.fxs=0; cam.fys=6.4;
+function rayAt(cx,cy){ const w=canvas.clientWidth, h=canvas.clientHeight; const nx=cx/w*2-1, ny=1-cy/h*2;
+  return norm([cam.F[0]+nx*cam.tanH*cam.aspect*cam.R[0]+ny*cam.tanH*cam.U[0], cam.F[1]+nx*cam.tanH*cam.aspect*cam.R[1]+ny*cam.tanH*cam.U[1], cam.F[2]+nx*cam.tanH*cam.aspect*cam.R[2]+ny*cam.tanH*cam.U[2]]); }
+function setFocus(cx,cy){ const rd=rayAt(cx,cy); if(rd[2]>=-1e-3) return; const t=-cam.pos[2]/rd[2];
+  const fx=clamp(cam.pos[0]+rd[0]*t,-4.2,4.2), fy=clamp(cam.pos[1]+rd[1]*t,2.6,14.0); const k=cam.d<0.3?1:0.35; cam.fx=lerp(cam.fx,fx,k); cam.fy=lerp(cam.fy,fy,k); }
+function updateCamera(t,dt,w,h){
+  const rate=(performance.now()-zoomActive<700)?7:1.6;
+  cam.d+= (cam.dT-cam.d)*(1-Math.exp(-dt*rate));
+  cam.sx+=(cam.mx-cam.sx)*(1-Math.exp(-dt*2.6)); cam.sy+=(cam.my-cam.sy)*(1-Math.exp(-dt*2.6));
+  cam.fxs+=(cam.fx-cam.fxs)*(1-Math.exp(-dt*3)); cam.fys+=(cam.fy-cam.fys)*(1-Math.exp(-dt*3));
+  const d=cam.d, e=clamp(d,0,1), ex=clamp(d-1,0,ZMAX-1), back=Math.max(0,-d);
+  const k=sstep(0.12,1.15,d), look=Math.max(0,d-0.75);
+  const pos=[ Math.sin(t*0.061)*0.14*(1-k)+cam.sx*0.45, 1.62+Math.sin(t*0.093)*0.035-cam.sy*0.18, lerp(15.0,4.6,e)-ex*2.6+back*9 ];
+  const tgtp=[ cam.sx*0.12, 6.6+back*0.4, -0.55 ];
+  // walking closer, you walk toward what you pointed at; up close the pointer turns your head
+  tgtp[0]=lerp(tgtp[0],cam.fxs,k)+cam.sx*1.6*look; tgtp[1]=lerp(tgtp[1],cam.fys,k)-cam.sy*1.5*look;
+  pos[0]=lerp(pos[0],cam.fxs,k*0.8); pos[1]=lerp(pos[1],Math.max(1.5,cam.fys-0.9),k*0.75);
+  { const sp=3.2*dt*(0.6+0.6*clamp(1-cam.d,0,1));   // metres per second, a little slower up close
+    if(held.ArrowLeft) cam.pxT-=sp; if(held.ArrowRight) cam.pxT+=sp; if(held.ArrowUp) cam.pyT+=sp; if(held.ArrowDown) cam.pyT-=sp;
+    if(held.ArrowLeft||held.ArrowRight||held.ArrowUp||held.ArrowDown) zoomActive=performance.now();
+    cam.pxT=clamp(cam.pxT,-5.2,5.2); cam.pyT=clamp(cam.pyT,-1.0,11.5);
+    cam.px+=(cam.pxT-cam.px)*(1-Math.exp(-dt*6)); cam.py+=(cam.pyT-cam.py)*(1-Math.exp(-dt*6));
+    pos[0]+=cam.px; tgtp[0]+=cam.px; pos[1]=Math.max(0.5,pos[1]+cam.py); tgtp[1]+=cam.py; }
+  const rad=Math.max(0.5,pos[2]+0.55), yawMax=Math.min(0.96,Math.asin(Math.min(1,6.4/rad)));
+  cam.yawMax=yawMax; cam.yawT=clamp(cam.yawT,-yawMax,yawMax);
+  cam.yaw+=(cam.yawT-cam.yaw)*(1-Math.exp(-dt*rate)); cam.yaw=clamp(cam.yaw,-yawMax,yawMax);
+  { const c=Math.cos(cam.yaw), s=Math.sin(cam.yaw), x=pos[0]-tgtp[0], z=pos[2]+0.55; pos[0]=tgtp[0]+x*c+z*s; pos[2]=-x*s+z*c-0.55; }
+  { const pv=[tgtp[0],tgtp[1],-0.55], v=sub(pos,pv), L=Math.hypot(...v), hz=Math.hypot(v[0],v[2])||1e-6, el0=Math.asin(v[1]/L);
+    const lo=Math.max(-0.9,Math.asin(clamp((0.45-pv[1])/L,-1,1))), hi=Math.min(0.9,Math.asin(clamp((17-pv[1])/L,-1,1)));
+    cam.pitchMin=lo-el0; cam.pitchMax=hi-el0; cam.pitchT=clamp(cam.pitchT,cam.pitchMin,cam.pitchMax);
+    cam.pitch+=(cam.pitchT-cam.pitch)*(1-Math.exp(-dt*rate)); cam.pitch=clamp(cam.pitch,cam.pitchMin,cam.pitchMax);
+    const el=el0+cam.pitch, ch=Math.cos(el)*L/hz;
+    pos[0]=pv[0]+v[0]*ch; pos[1]=pv[1]+Math.sin(el)*L; pos[2]=pv[2]+v[2]*ch; }
+  const F=norm(sub(tgtp,pos)), R=norm(cross(F,[0,1,0])), U=cross(R,F);
+  cam.aspect=w/h; let fov=lerp(61,58,e); if(cam.aspect<1.45) fov=Math.min(88,fov*Math.pow(1.45/cam.aspect,0.75));
+  cam.tanH=Math.tan(fov*Math.PI/360); cam.pos=pos; cam.F=F; cam.R=R; cam.U=U;
+  if(window.SITE&&SITE.cam) SITE.cam();
+}
+function pickAt(cx,cy){
+  const rd=rayAt(cx,cy); if(rd[2]>=0) return null; const ro=cam.pos, sp=1.13;
+  const t0=-ro[2]/rd[2], x0=ro[0]+rd[0]*t0, y0=ro[1]+rd[1]*t0;
+  const t=(-0.55-ro[2])/rd[2], x=ro[0]+rd[0]*t, y=ro[1]+rd[1]*t;
+  const u0=(x0/sp)/6+0.5, v0=0.5-((y0-4.1625)/sp)/4.125;
+  if(inWindow(u0*GW,v0*GH)){ const px=Math.floor((x/6+0.5)*GW), py=Math.floor((0.5-(y-4.1625)/4.125)*GH);
+    if(px<0||py<0||px>=GW||py>=GH) return null; const id=W.sid[py*GW+px]; return id===65535?null:{c:W.shards[id].comp, s:id, win:0}; }
+  if(Math.hypot(x0/sp,(y0-RCY)/sp)<=3.4){ const k=1236/3.4, px=Math.floor(1280+x*k), py=Math.floor(1280-(y-RCY)*k);
+    if(px<0||py<0||px>=RO.S||py>=RO.S) return null; const id=RO.sid[py*RO.S+px]; if(id>=65534) return null;
+    const g=ROSE_OFF+id; return {c:W.shards[g].comp, s:g, win:1, fam:W.shards[g].fam}; }
+  return null;
+}
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+let rw=0, rh=0, renderScale=Math.min(window.devicePixelRatio||1,1.5), frame=0, clock=0, last=0, ftAvg=16;
+const L=norm([-0.2,-1.0,0.95]);
+let sunNow=0.42, blazeNow=0, hoverC=-1, hoverAmt=0, selC=-1, exposure=0, glassDirty=true;
+function resize(){
+  const w=Math.max(2,Math.floor(canvas.clientWidth*renderScale)), h=Math.max(2,Math.floor(canvas.clientHeight*renderScale));
+  if(w===rw&&h===rh) return; rw=w; rh=h; canvas.width=w; canvas.height=h;
+  freeFbo(sceneF); freeFbo(volA); freeFbo(volB); bloomL.forEach(freeFbo);
+  sceneF=fbo(w,h); const vw=Math.max(2,w>>1), vh=Math.max(2,h>>1); volA=fbo(vw,vh); volB=fbo(vw,vh);
+  for(const v of [volA,volB]){ gl.bindFramebuffer(gl.FRAMEBUFFER,v.f); gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT); }
+  bloomL=[]; let bw=w, bh=h; for(let i=0;i<6;i++){ bw=Math.max(2,bw>>1); bh=Math.max(2,bh>>1); bloomL.push(fbo(bw,bh)); }
+}
+function setCamUniforms(u){ gl.uniform3fv(u.uCamPos,cam.pos); gl.uniform3fv(u.uCamR,cam.R); gl.uniform3fv(u.uCamU,cam.U); gl.uniform3fv(u.uCamF,cam.F); gl.uniform1f(u.uTanH,cam.tanH); gl.uniform1f(u.uAspect,cam.aspect); }
+function setSceneUniforms(u,w,h){ setCamUniforms(u); gl.uniform2f(u.uRes,w,h); gl.uniform3fv(u.uL,L); gl.uniform1f(u.uTime,clock); gl.uniform1f(u.uSun,0.45+0.7*sunNow); gl.uniform1f(u.uSunView,1.7); gl.uniform1f(u.uSunFloor,5.2); gl.uniform1f(u.uCloud,cloudNow); gl.uniform1f(u.uSunGlass,0.45+0.7*sunNow); }
+let cloudNow=1;
+const CANDLES=[]; { for(const sx of [-2.7,2.7]){ for(let k=0;k<7;k++){ const a=(k-3)/3; CANDLES.push([sx+a*0.42, 1.66+0.2*(1-a*a), 3.4+Math.abs(a)*0.05]); } }
+  for(const sx of [-5.15,5.15]) for(let k=0;k<3;k++) CANDLES.push([sx+(k-1)*0.16, 2.35+(k===1?0.1:0), 0.22]); }
+const candU=new Float32Array(80);
+function candleUniforms(u){ for(let i=0;i<CANDLES.length;i++){ const c=CANDLES[i]; const f=0.8+0.12*Math.sin(clock*7.3+i*1.7)+0.08*Math.sin(clock*13.1+i*4.3)+0.05*Math.sin(clock*2.1+i);
+    candU.set([c[0]+0.004*Math.sin(clock*5+i), c[1], c[2], 0.11*f],i*4); }
+  gl.uniform4fv(u.uCand,candU); gl.uniform1i(u.uCandN,CANDLES.length); }
+function bindGlassLib(u){ bindT(1,idTex); gl.uniform1i(u.uId,1); bindT(2,leadTex); gl.uniform1i(u.uLead,2); bindT(3,colTex); gl.uniform1i(u.uShardCol,3); bindT(4,stateTex); gl.uniform1i(u.uShardState,4); bindT(5,metaTex); gl.uniform1i(u.uShardMeta,5); gl.uniform1i(u.uShardW,SHW); }
+
+function renderGlass(win){
+  const R=win===1, F=R?glassRF:glassF, pr=P.glass, u=pr.u; gl.useProgram(pr.p); bindT(0,null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,F.f); gl.viewport(0,0,F.w,F.h);
+  bindT(1,R?idTexR:idTex); gl.uniform1i(u.uId,1); bindT(2,R?leadTexR:leadTex); gl.uniform1i(u.uLead,2);
+  bindT(3,colTex); gl.uniform1i(u.uShardCol,3); bindT(4,stateTex); gl.uniform1i(u.uShardState,4); bindT(5,metaTex); gl.uniform1i(u.uShardMeta,5); gl.uniform1i(u.uShardW,SHW);
+  bindT(6,R?glintTexR:paintTex); gl.uniform1i(u.uPaint,6); bindT(7,R?roseTintTex:tintTex); gl.uniform1i(u.uTint,7);
+  gl.uniform1i(u.uIdOff,R?ROSE_OFF:0); gl.uniform1i(u.uRose,R?1:0); gl.uniform2f(u.uG,F.w,F.h);
+  gl.uniform1f(u.uWAll,R?1.5:1.75); gl.uniform1f(u.uWZone,R?2.3:2.5);
+  gl.uniform1f(u.uTime,clock); gl.uniform1f(u.uHoleK,0.058/(0.45+0.7*sunNow));
+  const A=new Float32Array(64), B=new Float32Array(64); let n=0;
+  for(const a of anims){ if(n>=16) break; if((W.shards[a.s].win===1)!==R) continue; A.set([a.s,a.cx,a.cy,a.rot],n*4); B.set([a.ox,a.oy,a.sc,a.al],n*4); n++; }
+  gl.uniform4fv(u.uAnimA,A); gl.uniform4fv(u.uAnimB,B); gl.uniform1i(u.uAnimN,n);
+  drawQuad(); gl.bindFramebuffer(gl.FRAMEBUFFER,null); bindT(0,F.t); gl.generateMipmap(gl.TEXTURE_2D);
+}
+function bindRose(u,uGlassUnit,more){ bindT(uGlassUnit,glassRF.t); gl.uniform1i(u.uGlassR,uGlassUnit);
+  if(more){ bindT(7,idTexR); gl.uniform1i(u.uIdR,7); bindT(8,leadTexR); gl.uniform1i(u.uLeadR,8); gl.uniform1i(u.uRoseOff,ROSE_OFF); } }
+function render(target){ const vc=renderChapel(); post(vc.t,vc.w,vc.h,target||null); frame++; }
+function renderChapel(){
+  const w=rw, h=rh;
+  // on the site the glass changes every frame while it colours in: redraw one window per frame, alternating, to keep motion smooth
+  if(window.SITE){ if(glassDirtyL&&(frame%2===0||!glassDirtyR)){ renderGlass(0); glassDirtyL=false; } else if(glassDirtyR){ renderGlass(1); glassDirtyR=false; } }
+  else { if(glassDirtyL){ renderGlass(0); glassDirtyL=false; } if(glassDirtyR){ renderGlass(1); glassDirtyR=false; } }
+  // the chapel
+  let pr=P.main, u=pr.u; gl.useProgram(pr.p); gl.bindFramebuffer(gl.FRAMEBUFFER,sceneF.f); gl.viewport(0,0,w,h);
+  bindT(0,glassF.t); gl.uniform1i(u.uGlass,0); bindGlassLib(u); bindRose(u,6,true); setSceneUniforms(u,w,h);
+  gl.uniform1f(u.uHover,hoverC); gl.uniform1f(u.uHoverAmt,hoverAmt); gl.uniform1f(u.uSel,selC); candleUniforms(u);
+  drawQuad();
+  // dust in the beams
+  pr=P.motes; u=pr.u; gl.useProgram(pr.p); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE);
+  bindT(0,glassF.t); gl.uniform1i(u.uGlass,0); bindRose(u,1,false); setSceneUniforms(u,w,h); gl.uniform1f(u.uPx,renderScale);
+  gl.bindVertexArray(motesVao); gl.drawArrays(gl.POINTS,0,MOTES); gl.disable(gl.BLEND);
+  // light in the air
+  const [vc,vp]= (frame%2)?[volA,volB]:[volB,volA];
+  pr=P.vol; u=pr.u; gl.useProgram(pr.p); gl.bindFramebuffer(gl.FRAMEBUFFER,vc.f); gl.viewport(0,0,vc.w,vc.h);
+  bindT(0,glassF.t); gl.uniform1i(u.uGlass,0); bindT(1,noiseTex,gl.TEXTURE_3D); gl.uniform1i(u.uNoise,1); bindT(2,vp.t); gl.uniform1i(u.uPrev,2); bindRose(u,3,false);
+  setSceneUniforms(u,vc.w,vc.h); gl.uniform1f(u.uVolDen,0.17*(1+blazeNow*0.25)); gl.uniform1f(u.uFrame,frame%64); gl.uniform1f(u.uBlend,frame<3?1:0.32);
+  drawQuad();
+  return vc;
+}
+function post(volT,vw,vh,target){
+  const w=rw, h=rh; let pr, u;
+  // bloom
+  pr=P.down; u=pr.u; gl.useProgram(pr.p);
+  for(let i=0;i<bloomL.length;i++){ const dst=bloomL[i], src=i===0?sceneF:bloomL[i-1]; gl.bindFramebuffer(gl.FRAMEBUFFER,dst.f); gl.viewport(0,0,dst.w,dst.h);
+    bindT(0,src.t); gl.uniform1i(u.uSrc,0); bindT(1,volT); gl.uniform1i(u.uVol,1); gl.uniform1i(u.uFirst,i===0?1:0); gl.uniform2f(u.uTexel,1/src.w,1/src.h); drawQuad(); }
+  pr=P.up; u=pr.u; gl.useProgram(pr.p); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE);
+  for(let i=bloomL.length-2;i>=0;i--){ const dst=bloomL[i], src=bloomL[i+1]; gl.bindFramebuffer(gl.FRAMEBUFFER,dst.f); gl.viewport(0,0,dst.w,dst.h);
+    bindT(0,src.t); gl.uniform1i(u.uSrc,0); gl.uniform2f(u.uTexel,1/src.w,1/src.h); gl.uniform1f(u.uRadius,1.0); drawQuad(); }
+  gl.disable(gl.BLEND);
+  // develop
+  pr=P.final; u=pr.u; gl.useProgram(pr.p); gl.bindFramebuffer(gl.FRAMEBUFFER,target?target.f:null); gl.viewport(0,0,w,h);
+  bindT(0,sceneF.t); gl.uniform1i(u.uScene,0); bindT(1,volT); gl.uniform1i(u.uVol,1); bindT(2,bloomL[0].t); gl.uniform1i(u.uBloom,2);
+  gl.uniform2f(u.uRes,w,h); gl.uniform2f(u.uVolTexel,1/vw,1/vh); gl.uniform1f(u.uExposure,exposure); gl.uniform1f(u.uBloomMix,0.085+0.07*blazeNow); gl.uniform1f(u.uTime,clock); gl.uniform1f(u.uBlaze,blazeNow);
+  drawQuad();
+}
+
+/* =====================================================================
+   ANIMATION
+   ===================================================================== */
+let completeShown=false, commonsA=0.46; const commonsIdx=[];
+function step(dt){
+  // start queued pieces when the glazier's hands are free
+  for(let i=0;i<queue.length&&anims.length<16;){ const q=queue[i]; if(clock>=q.at){ const sh=W.shards[q.s]; const r=mulberry32(q.s*7+((clock*1000)|0));
+      const ang=r()*Math.PI*2; anims.push({s:q.s,cx:sh.cx,cy:sh.cy,t0:clock,dur:1.15+r()*0.35,ox0:Math.cos(ang)*14,oy0:-26-r()*18,rot0:(r()-.5)*0.22,ox:0,oy:0,sc:1.1,rot:0,al:0}); queue.splice(i,1); } else i++; }
+  for(let i=anims.length-1;i>=0;i--){ const a=anims[i]; const t=clamp((clock-a.t0)/a.dur,0,1);
+    const e=1-Math.pow(1-t,3); const back=1+0.035*Math.sin(Math.min(1,t*1.15)*Math.PI)*(1-t);
+    a.ox=a.ox0*(1-e); a.oy=a.oy0*(1-e); a.rot=a.rot0*(1-e)*Math.cos(t*5); a.sc=lerp(1.12,1.0,e)*(t<1?back:1); a.al=clamp(t*3.2,0,1);
+    glassDirtyL=true;
+    if(t>=1){ const s=a.s; cur.hold[s]=0; cur.set[s]=1; cur.flash[s]=1; anims.splice(i,1); const sh=W.shards[s]; clink(sh.area,(sh.cx/GW)*2-1); } }
+  let changed=false, chL=false, chR=false;
+  for(let s=0;s<S;s++){
+    if(cur.hold[s]) { if(cur.set[s]!==0){cur.set[s]=0;changed=true;} continue; }
+    if(clock<cur.start[s]) continue;
+    const ts=tgt.set[s]; if(cur.set[s]!==ts){ const sp=cur.fl[s]?1.4:1.6; const prev=cur.set[s]; cur.set[s]= ts>prev?Math.min(ts,prev+dt*sp):Math.max(ts,prev-dt*sp); changed=true; if(cur.fl[s]&&cur.set[s]>=1&&prev<1){ cur.flash[s]=1; cur.fl[s]=0; if(s>=ROSE_OFF&&clock-lastRoseClink>0.07){ lastRoseClink=clock; clink(500+W.shards[s].area*0.2,(W.shards[s].cx/1280-1)*0.8); } } }
+    const dk=tgt.k[s]-cur.k[s], da=tgt.a[s]-cur.a[s];
+    if(Math.abs(dk)>1e-3){ cur.k[s]+=dk*(1-Math.exp(-dt*3)); changed=true; } else if(dk!==0){cur.k[s]=tgt.k[s];changed=true;}
+    if(Math.abs(da)>1e-3){ cur.a[s]+=da*(1-Math.exp(-dt*3)); changed=true; } else if(da!==0){cur.a[s]=tgt.a[s];changed=true;}
+    if(cur.gold[s]!==tgt.gold[s]){ cur.gold[s]=tgt.gold[s]; if(cur.gold[s]) cur.flash[s]=Math.max(cur.flash[s],0.6); changed=true; }
+    if(cur.flash[s]>0){ cur.flash[s]=Math.max(0,cur.flash[s]-dt*0.75); changed=true; }
+  }
+  if(changed){ for(let s=0;s<S;s++){ const o=s*4, f=cur.flash[s], fe=f*f*(3-2*f);
+      const v0=Math.round(clamp(cur.set[s],0,1)*255), v1=Math.round(cur.k[s]*255), v2=Math.round(cur.a[s]*255), v3=Math.round((cur.gold[s]*0.5+fe*0.49)*255);
+      if(stateData[o]!==v0||stateData[o+1]!==v1||stateData[o+2]!==v2||stateData[o+3]!==v3){ if(s<ROSE_OFF) chL=true; else chR=true; }
+      stateData[o]=v0; stateData[o+1]=v1; stateData[o+2]=v2; stateData[o+3]=v3; }
+    gl.bindTexture(gl.TEXTURE_2D,stateTex); gl.pixelStorei(gl.UNPACK_ALIGNMENT,1); gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,SHW,SHH,gl.RGBA,gl.UNSIGNED_BYTE,stateData); if(chL) glassDirtyL=true; if(chR) glassDirtyR=true; }
+  // the sun answers to how much is set, and how well it is understood
+  let prog=0, allSet=true, aSum=0;
+  for(let ci=0;ci<CO.length;ci++){ const sh=companyShards[ci]; if(!sh.length) continue; let sv=0,av=0; for(const s of sh){ sv+=cur.set[s]; av+=cur.a[s]; } sv/=sh.length; av/=sh.length; prog+=sv*(0.3+0.7*av); aSum+=av*sv; if(sv<0.985) allSet=false; }
+  prog/=CO.length; const meanA=aSum/CO.length;
+  { let sl=0, st=0; for(let ci=0;ci<CO.length;ci++){ if(!satN[ci]) continue; const sh=companyShards[ci]; let sv=0,av=0; for(const s of sh){ sv+=cur.set[s]; av+=cur.a[s]; } sv/=sh.length; av/=sh.length; sl+=satN[ci]*sv*(0.3+0.7*av); st+=satN[ci]; }
+    if(st) prog=0.5*prog+0.5*sl/st; }
+  const blazeT=allSet?sstep(0.55,1.0,meanA):0;
+  blazeNow+=(blazeT-blazeNow)*(1-Math.exp(-dt*0.5));
+  const sunT=(0.42+0.58*prog)*(1+0.4*blazeNow);
+  sunNow+=(sunT-sunNow)*(1-Math.exp(-dt*0.9));
+  cloudNow=lerp(0.88+0.12*(0.5+0.5*Math.sin(clock*0.11)*Math.sin(clock*0.047+1.3)), 1, blazeNow);
+  if(allSet && blazeT>0.5 && !completeShown && clock>4){ completeShown=true; toast(preview?'Imagine it whole':'The window is whole', preview?'every pane set, every fall mended':'the sun is at full strength'); chord(); }
+  if(!allSet) completeShown=false;
+  hoverAmt+=((hoverC>=0?1:0)-hoverAmt)*(1-Math.exp(-dt*8));
+  { const w=Math.max(blazeNow, sstep(0.15,1.0,prog)), ka=0.85+0.15*w, aa=0.46+0.54*w;
+    if(Math.abs(aa-commonsA)>0.004){ commonsA=aa; for(const s of commonsIdx){ tgt.k[s]=ka; tgt.a[s]=aa; } } }
+  updateTally(prog);
+}
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+function makeNoise3D(){ const n=64, a=new Float32Array(n*n*n), r=mulberry32(11); for(let i=0;i<a.length;i++) a[i]=r();
+  const blur=(src)=>{ const dst=new Float32Array(src.length); const R=2;
+    for(let axis=0;axis<3;axis++){ const s=axis===0?src:dst.slice(); const d=axis===0?dst:dst; const tmp=new Float32Array(src.length);
+      for(let z=0;z<n;z++) for(let y=0;y<n;y++) for(let x=0;x<n;x++){ let sum=0; for(let k=-R;k<=R;k++){ const xx=axis===0?(x+k+n)%n:x, yy=axis===1?(y+k+n)%n:y, zz=axis===2?(z+k+n)%n:z; sum+=s[(zz*n+yy)*n+xx]; } tmp[(z*n+y)*n+x]=sum/(2*R+1); }
+      d.set(tmp); }
+    return dst; };
+  let b=blur(blur(a)); let mn=1e9,mx=-1e9; for(const v of b){ if(v<mn)mn=v; if(v>mx)mx=v; }
+  const out=new Uint8Array(n*n*n); for(let i=0;i<out.length;i++) out[i]=Math.round((b[i]-mn)/(mx-mn)*255);
+  const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_3D,t); gl.pixelStorei(gl.UNPACK_ALIGNMENT,1); gl.texImage3D(gl.TEXTURE_3D,0,gl.R8,n,n,n,0,gl.RED,gl.UNSIGNED_BYTE,out);
+  gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  for(const p of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T,gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D,p,gl.REPEAT); return t; }
+
+async function boot(){
+  const t0=performance.now();
+  W=await buildWindow(); W.shards.forEach(s=>{ s.win=0; s.kind=0; });
+  RO=await buildRose(); ROSE_OFF=W.shards.length; for(const p of RO.pieces) W.shards.push(p);
+  console.log('windows cut in',Math.round(performance.now()-t0),'ms —',ROSE_OFF,'lancet pieces,',RO.pieces.length,'rose pieces,',RO.data.sats,'satellites');
+  initState();
+  idTexR=tex2D(RO.S,RO.S,gl.R16UI,gl.RED_INTEGER,gl.UNSIGNED_SHORT,RO.sid,gl.NEAREST,gl.CLAMP_TO_EDGE,false);
+  leadTexR=tex2D(RO.S,RO.S,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,RO.lead,gl.LINEAR,gl.CLAMP_TO_EDGE,false);
+  glintTexR=tex2D(RO.S,RO.S,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,RO.glint,gl.LINEAR,gl.CLAMP_TO_EDGE,false);
+  roseTintTex=tex2D(RO.tint.w,RO.tint.h,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,RO.tint.data,gl.LINEAR,gl.CLAMP_TO_EDGE,false);
+  glassRF=fbo(RO.S,RO.S,true);
+  idTex=tex2D(GW,GH,gl.R16UI,gl.RED_INTEGER,gl.UNSIGNED_SHORT,W.sid,gl.NEAREST,gl.CLAMP_TO_EDGE,false);
+  leadTex=tex2D(GW,GH,gl.RG8,gl.RG,gl.UNSIGNED_BYTE,W.lead,gl.LINEAR,gl.CLAMP_TO_EDGE,false);
+  tintTex=tex2D(W.tint.w,W.tint.h,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,W.tint.data,gl.LINEAR,gl.CLAMP_TO_EDGE,false);
+  paintTex=tex2D(GW,GH,gl.RG8,gl.RG,gl.UNSIGNED_BYTE,W.paint,gl.LINEAR,gl.CLAMP_TO_EDGE,false);
+  const cd=new Uint8Array(SHW*SHH*4), md=new Uint8Array(SHW*SHH*4);
+  W.shards.forEach((s,i)=>{ cd.set([s.col[0],s.col[1],s.col[2],Math.round(s.seed*255)],i*4); md.set([s.comp&255,s.comp>>8,s.zone,s.kind||0],i*4); });
+  colTex=tex2D(SHW,SHH,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,cd,gl.NEAREST,gl.CLAMP_TO_EDGE,false);
+  metaTex=tex2D(SHW,SHH,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,md,gl.NEAREST,gl.CLAMP_TO_EDGE,false);
+  stateTex=tex2D(SHW,SHH,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,stateData,gl.NEAREST,gl.CLAMP_TO_EDGE,false);
+  noiseTex=makeNoise3D();
+  glassF=fbo(GW,GH,true);
+  P.glass=program(VS_QUAD,FS_GLASS); P.main=program(VS_QUAD,FS_MAIN); P.vol=program(VS_QUAD,FS_VOL);
+  P.motes=program(VS_MOTES,FS_MOTES); P.down=program(VS_QUAD,FS_DOWN); P.up=program(VS_QUAD,FS_UP); P.final=program(VS_QUAD,FS_FINAL);
+  // seed live state into the texture
+  for(let s=0;s<S;s++){ const o=s*4; stateData[o]=cur.set[s]*255; stateData[o+1]=cur.k[s]*255; stateData[o+2]=cur.a[s]*255; stateData[o+3]=cur.gold[s]*127; }
+  gl.bindTexture(gl.TEXTURE_2D,stateTex); gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,SHW,SHH,gl.RGBA,gl.UNSIGNED_BYTE,stateData);
+  buildLedger(); updateTally(0);
+  resize(); cam.dT=0;
+  requestAnimationFrame(t=>{ last=t; requestAnimationFrame(loop); });
+  setTimeout(()=>document.getElementById('veil').classList.add('gone'),300);
+  if(location.hash==='#whole') setTimeout(()=>togglePreview(true),1500);
+  if(window.SITE) SITE.ready();
+}
+let introT=0; const titleEl=document.getElementById('title');
+function loop(t){
+  const dt=Math.min(0.05,(t-last)/1000); last=t; clock+=dt; introT+=dt;
+  ftAvg=lerp(ftAvg,dt*1000,0.05);
+  { const hi=window.SITE?Math.min(window.devicePixelRatio||1,1):Math.min(window.devicePixelRatio||1,1.5), every=window.SITE?15:60;
+    // keep the frame rate first: drop resolution fast when frames run long, raise it slowly when there is room
+    if(frame>30 && frame%every===0 && !window.FILM_LOCK){ if(ftAvg>19 && renderScale>0.5){ renderScale=Math.max(0.5,renderScale-0.1); } else if(ftAvg<12 && renderScale<hi){ renderScale=Math.min(hi,renderScale+0.04); } else if(renderScale>hi) renderScale=hi; } }
+  resize();
+  exposure=lerp(0,1.0,sstep(0,5.5,introT));
+  if(window.SITE) SITE.before(dt);
+  updateCamera(clock,dt,rw,rh);
+  { const o=(1-sstep(0.7,1.05,cam.d)*0.88).toFixed(2); if(titleEl.style.opacity!==o) titleEl.style.opacity=o; }
+  step(dt);
+  if(window.SITE) SITE.render(dt); else render();
+  requestAnimationFrame(loop);
+}
+
+/* =====================================================================
+   UI
+   ===================================================================== */
+const $=id=>document.getElementById(id);
+function swatchColor(c,k,a,sunMul=2.2){ // approximate the lit pane for the ledger
+  const s=W.shards[companyShards[c.idx][0]]; if(!s) return '#222';
+  const lin=s.col.map(v=>Math.pow(v/255,2.2)); const lum=0.2126*lin[0]+0.7152*lin[1]+0.0722*lin[2];
+  const pale=[0.8,0.85,0.78].map((p,i)=>lerp(p,lin[i]/(lum+0.001)*0.82,0.12));
+  const kk=k*k*(3-2*k); const br=lerp(0.06,1,Math.pow(a,0.85));
+  return 'rgb('+lin.map((v,i)=>{ let x=lerp(pale[i],v,kk)*br*sunMul; x=x/(1+x)*1.15; return Math.round(Math.pow(clamp(x,0,1),1/2.2)*255); }).join(',')+')';
+}
+function buildLedger(){
+  const list=$('list'); list.innerHTML='';
+  GROUPS.forEach(([g,title,note])=>{ const cs=CO.filter(c=>c.group===g); if(!cs.length) return;
+    const gd=document.createElement('div'); gd.className='grp'; gd.innerHTML=`<div class="gt"></div><div class="gn"></div>`; gd.querySelector('.gt').textContent=`${title}  ·  ${cs.length}`; gd.querySelector('.gn').textContent=note; list.appendChild(gd);
+    cs.sort((a,b)=>(a.sector||'~').localeCompare(b.sector||'~')||a.name.localeCompare(b.name));
+    let sec=null; cs.forEach(c=>{ const sname=c.sector||(g==='undergrowth'?'unclassified':''); if(sname!==sec && cs.length>8){ sec=sname; const sd=document.createElement('div'); sd.className='sec'; sd.textContent=sname; list.appendChild(sd); }
+      const r=document.createElement('div'); r.className='row'; r.dataset.id=c.id; r.innerHTML=`<div class="sw"></div><div class="nm"></div><div class="st"></div>`; r.querySelector('.nm').textContent=c.name; r.onclick=()=>openCard(c.idx); list.appendChild(r); }); });
+  $('tAll').textContent=CO.length; $('lTitle').textContent=`${CO.length} panes`; refreshLedger();
+}
+function refreshLedger(){
+  document.querySelectorAll('#list .row').forEach(r=>{ const c=CO[COI[r.dataset.id]], rec=saved[c.id]; const on=rec&&rec.set; r.classList.toggle('set',!!on);
+    const sw=r.querySelector('.sw'), st=r.querySelector('.st');
+    if(on){ sw.style.background=swatchColor(c,rec.k/100,acumenOf(rec)); sw.style.borderColor=(rec.gold&&c.fall)?'#c9a14e':'#2a2724'; st.textContent=(rec.gold&&c.fall)?'gilded':'set'; st.className='st'+((rec.gold&&c.fall)?' g':''); }
+    else { sw.style.background='transparent'; sw.style.borderColor='#2a2724'; st.textContent=c.fall?'fallen':''; st.className='st'; } });
+}
+$('search').addEventListener('input',e=>{ const q=e.target.value.trim().toLowerCase(); document.querySelectorAll('#list .row').forEach(r=>{ const c=CO[COI[r.dataset.id]]; r.style.display=(!q||c.name.toLowerCase().includes(q)||(c.sector||'').toLowerCase().includes(q)||(c.country||'').toLowerCase().includes(q)||GRP[c.group].title.toLowerCase().includes(q))?'':'none'; });
+  document.querySelectorAll('#list .sec, #list .grp').forEach(g=>{ let any=false; let n=g.nextElementSibling; while(n&&(n.classList.contains('row')||(g.classList.contains('grp')&&n.classList.contains('sec')))){ if(n.classList.contains('row')&&n.style.display!=='none') any=true; n=n.nextElementSibling; } g.style.display=any?'':'none'; }); });
+let cardC=-1;
+function openLedger(){ $('ledger').classList.add('open'); }
+function closeLedger(){ $('ledger').classList.remove('open'); $('card').classList.remove('show'); selC=-1; cardC=-1; }
+function openCard(ci){
+  if(preview) togglePreview(false);
+  cardC=ci; selC=ci; const c=CO[ci], rec=saved[c.id]; openLedger();
+  $('cRg').textContent=GRP[c.group].title; $('cName').textContent=c.name;
+  $('cDesc').textContent=[c.sector||'Sector not yet recorded', c.country, c.founded?('founded '+c.founded):''].filter(Boolean).join('  ·  ');
+  $('cSize').textContent=sizeLine(c);
+  { const n=satN[c.idx]||0; $('cSats').style.display=n?'':'none';
+    if(n){ const fl=famsOf[c.idx].map(j=>RO.data.families[j]).sort((a,b)=>b.n-a.n); $('cSats').textContent=`${n.toLocaleString()} satellite${n>1?'s':''} in the rose`+(fl.length>1?` · ${fl.length} families, largest ${fl[0].l}`:''); } } $('cSt').textContent=(!c.fall&&c.status)?c.status:''; $('cSt').style.display=(!c.fall&&c.status)?'':'none';
+  $('cFall').style.display=c.fall?'':'none'; $('cFall').textContent=c.fall?((c.dead?'Fallen — ':'The fall — ')+c.fall):'';
+  $('cGold').style.display=c.fall?'':'none';
+  const v=rec||{k:60,ex:50,pr:50,pd:50,gold:false};
+  $('rK').value=v.k; $('rE').value=v.ex; $('rP').value=v.pr; $('rD').value=v.pd; $('cGold').classList.toggle('on',!!v.gold);
+  $('cSet').textContent=rec&&rec.set?'Re-set the glass':'Set the glass'; $('cRemove').style.display=rec&&rec.set?'':'none';
+  syncCard(); $('card').classList.add('show'); $('card').querySelector('.in').scrollTop=0;
+}
+function cardVals(){ return {k:+$('rK').value, ex:+$('rE').value, pr:+$('rP').value, pd:+$('rD').value, gold:$('cGold').classList.contains('on')}; }
+function syncCard(){ const v=cardVals(); ['rK','rE','rP','rD'].forEach(id=>$(id).style.setProperty('--p',$(id).value+'%'));
+  $('oK').textContent=v.k; $('oE').textContent=v.ex; $('oP').textContent=v.pr; $('oD').textContent=v.pd; const a=Math.round((v.ex+v.pr+v.pd)/3); $('oA').textContent=a;
+  if(cardC<0) return; const c=CO[cardC]; const pane=$('cPane'); const col=swatchColor(c,v.k/100,a/100,2.6);
+  pane.style.background=`radial-gradient(120% 90% at 50% 20%, ${col}, ${swatchColor(c,v.k/100,a/100,1.3)})`;
+  pane.style.boxShadow=`0 0 0 1px ${v.gold&&c.fall?'#d9b46a':'#3a352c'}, 0 0 ${8+a*0.35}px ${col.replace('rgb','rgba').replace(')',',.35)')}, inset 0 0 12px rgba(0,0,0,.35)`;
+  pane.style.borderColor=v.gold&&c.fall?'#c9a14e':'#1d1b19';
+  const kw=v.k<20?'clear, barely tinted':v.k<45?'a pale wash of colour':v.k<75?'true colour':'deep, saturated pot-metal';
+  const aw=a<20?'the light barely comes through':a<45?'a dim glow':a<75?'light passes cleanly':'the sun pours through';
+  $('cPt').textContent=`${kw}; ${aw}.`+(c.fall&&v.gold?' Mended with gold.':'');
+}
+['rK','rE','rP','rD'].forEach(id=>$(id).addEventListener('input',syncCard));
+$('cGold').onclick=()=>{ $('cGold').classList.toggle('on'); syncCard(); };
+$('cBack').onclick=()=>{ $('card').classList.remove('show'); selC=-1; cardC=-1; };
+$('cSet').onclick=()=>{ if(cardC<0) return; const c=CO[cardC]; const v=cardVals(); const was=saved[c.id]&&saved[c.id].set;
+  saved[c.id]={...v,set:true,t:Date.now()}; persist(); applyTargets(cardC,saved[c.id],{fly:!was}); refreshLedger(); audio();
+  const ci=cardC; closeLedger(); if(!was){ cam.dT=Math.max(cam.dT,0.18); } flashName(ci); };
+$('cRemove').onclick=()=>{ if(cardC<0) return; const c=CO[cardC]; if(saved[c.id]) saved[c.id].set=false; persist(); applyTargets(cardC,saved[c.id]); refreshLedger(); $('card').classList.remove('show'); selC=-1; cardC=-1; };
+$('lClose').onclick=closeLedger; $('bLedger').onclick=()=>{ $('ledger').classList.contains('open')?closeLedger():openLedger(); };
+$('lReset').onclick=()=>{ if(!confirm('Lift every pane out of the window? Your ledger will be cleared.')) return; saved={}; persist(); CO.forEach((c,i)=>applyTargets(i,null)); refreshLedger(); };
+$('lExport').onclick=()=>{ const lines=CO.filter(c=>saved[c.id]&&saved[c.id].set).map(c=>{const r=saved[c.id];return `${c.name}\tknowledge ${r.k}\texplain ${r.ex}\tprice ${r.pr}\tpredict ${r.pd}${r.gold&&c.fall?'\tgilded':''}`;});
+  navigator.clipboard?.writeText(lines.join('\n')||'(the window is still empty)'); $('lExport').textContent='Copied'; setTimeout(()=>$('lExport').textContent='Copy my ledger',1600); };
+function togglePreview(on){ on=on??!preview; if(on===preview) return; $('bPreview').classList.toggle('on',on); $('bPreview').textContent=on?'Return to my window':'Imagine it whole';
+  if(on){ closeLedger(); previewOn(); cam.dT=0; toast('Imagine it whole','every company known, every fall understood'); } else { previewOff(); } }
+$('bPreview').onclick=()=>{ audio(); togglePreview(); };
+$('bSound').onclick=()=>{ soundOn=!soundOn; $('bSound').classList.toggle('on',soundOn); $('bSound').style.opacity=soundOn?1:0.5; if(soundOn) audio(); };
+$('bSound').classList.add('on');
+let toastT=null; function toast(a,b){ const t=$('toast'); t.querySelector('.a').textContent=a; t.querySelector('.b').textContent=b; t.style.opacity=1; clearTimeout(toastT); toastT=setTimeout(()=>t.style.opacity=0,3800); }
+function flashName(ci){ const c=CO[ci]; toast(c.name, (c.sector||GRP[c.group].title).toLowerCase()); }
+function updateTally(prog){ let n=0,g=0,sl=0; CO.forEach(c=>{ const r=saved[c.id]; if(r&&r.set){ n++; sl+=satN[c.idx]||0; if(r.gold&&c.fall) g++; } }); $('tSat').textContent=sl.toLocaleString()+' / '+(RO?RO.data.sats.toLocaleString():'');
+  $('tSet').textContent=n; $('tSun').textContent=Math.round(sunNow/1.4*100)+'%'; $('sunbar').firstElementChild.style.width=Math.round(clamp(sunNow/1.4,0,1)*100)+'%'; $('tGold').textContent=g; $('tGoldW').style.display=g?'':'none'; }
+
+// pointer
+const tip=$('tip'); let hintGone=false;
+function hideHint(){ if(!hintGone){ hintGone=true; $('hint').style.opacity=0; } }
+canvas.addEventListener('pointermove',e=>{
+  cam.mx=(e.clientX/canvas.clientWidth-0.5)*2; cam.my=(e.clientY/canvas.clientHeight-0.5)*2;
+  if(!W) return; const hit=pickAt(e.clientX,e.clientY); const c=hit?hit.c:-1; hoverC=c; canvas.classList.toggle('pointing',c>=0);
+  if(hit&&hit.win===1){ const F=hit.fam>=0?RO.data.families[hit.fam]:null;
+    tip.querySelector('.n').textContent=F?F.l:'Earth';
+    tip.querySelector('.r').textContent=F?(F.c>=0?CO[F.c].name:'The commons · '+(F.o||'unlisted operator')):'the oculus';
+    const s=tip.querySelector('.s'); s.className='s';
+    s.textContent=F?`${F.n.toLocaleString()} satellite${F.n>1?'s':''} · ${F.r} · ${F.a.toLocaleString()} km · ${F.i}°`+(F.c>=0&&!(saved[CO[F.c].id]&&saved[CO[F.c].id].set)?' · click to study':''):'every orbit circles it';
+    tip.style.left=e.clientX+'px'; tip.style.top=e.clientY+'px'; tip.style.opacity=1; return; }
+  if(c>=0){ const co=CO[c], r=saved[co.id]; tip.querySelector('.n').textContent=co.name; tip.querySelector('.r').textContent=GRP[co.group].title+(co.sector?'  ·  '+co.sector:'')+(co.size&&co.size.usd?'  ·  '+co.size.usd:'');
+    const s=tip.querySelector('.s'); if(preview){ s.textContent='imagined'; s.className='s'; }
+    else if(r&&r.set){ s.textContent=`knowledge ${r.k} · acumen ${Math.round(acumenOf(r)*100)}`+(r.gold&&co.fall?' · gilded':''); s.className='s'+(r.gold&&co.fall?' gold':''); }
+    else { s.textContent=co.fall?'fallen — click to study':'unset — click to study'; s.className='s'; }
+    tip.style.left=e.clientX+'px'; tip.style.top=e.clientY+'px'; tip.style.opacity=1; } else tip.style.opacity=0; });
+canvas.addEventListener('pointerleave',()=>{ hoverC=-1; tip.style.opacity=0; cam.mx=0; cam.my=0; });
+canvas.addEventListener('click',e=>{ audio(); hideHint(); const h=pickAt(e.clientX,e.clientY); if(h&&h.c>=0) openCard(h.c); });
+function zoomTo(v){ cam.dT=clamp(v,0,ZMAX); zoomActive=performance.now(); hideHint(); }
+// mouse wheel, two-finger scroll, and trackpad pinch (which browsers send as ctrl+wheel with small steps)
+function turnBy(a){ const m=cam.yawMax||0.6; cam.yawT=clamp(cam.yawT+a,-m,m); zoomActive=performance.now(); hideHint(); }
+function tiltBy(a){ cam.pitchT=clamp(cam.pitchT+a,cam.pitchMin??-0.3,cam.pitchMax??0.5); zoomActive=performance.now(); hideHint(); }
+// a mouse wheel clicks in big whole steps; a trackpad glides in small ones
+const isMouseWheel=e=>e.deltaMode!==0||(e.deltaX===0&&Math.abs(e.deltaY)>=50&&Number.isInteger(e.deltaY));
+canvas.addEventListener('wheel',e=>{ e.preventDefault();
+  const u=e.deltaMode===1?16:e.deltaMode===2?400:1, dx=e.deltaX*u, dy=e.deltaY*u;
+  if((e.ctrlKey&&dy<0)||(isMouseWheel(e)&&dy<0)) setFocus(e.clientX,e.clientY);
+  if(e.ctrlKey){ zoomTo(cam.dT-dy*0.014); return; }                  // pinch
+  if(isMouseWheel(e)){ zoomTo(cam.dT-dy*0.0018); return; }          // mouse wheel: walk toward / away
+  if(Math.abs(dx)>Math.abs(dy)*0.8) turnBy(dx*0.0032);                // two-finger swipe left/right: orbit sideways
+  else tiltBy(-dy*0.0026); },{passive:false});                       // two-finger swipe up/down: orbit up/down
+// Safari trackpad pinch
+let gz0=0; window.addEventListener('gesturestart',e=>{ if(window.SITE) return; e.preventDefault(); gz0=cam.dT; },{passive:false});
+window.addEventListener('gesturechange',e=>{ if(window.SITE) return; e.preventDefault(); if(e.scale>1) setFocus(e.clientX,e.clientY); zoomTo(gz0+Math.log(e.scale)*1.5); },{passive:false});
+window.addEventListener('gestureend',e=>{ if(!window.SITE) e.preventDefault(); },{passive:false});
+// touch screens: two-finger pinch, one-finger drag
+let touchY=null, pinch0=null, pinchZ=0, midX=0, midY=0;
+const tdist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+canvas.addEventListener('touchstart',e=>{ if(e.touches.length===2){ pinch0=tdist(e.touches); pinchZ=cam.dT; touchY=null; midX=(e.touches[0].clientX+e.touches[1].clientX)/2; midY=(e.touches[0].clientY+e.touches[1].clientY)/2; } else if(e.touches.length===1){ touchY=e.touches[0].clientY; } },{passive:true});
+canvas.addEventListener('touchmove',e=>{
+  if(e.touches.length===2&&pinch0){ e.preventDefault(); const nz=pinchZ+Math.log(tdist(e.touches)/pinch0)*1.6; if(nz>cam.dT) setFocus((e.touches[0].clientX+e.touches[1].clientX)/2,(e.touches[0].clientY+e.touches[1].clientY)/2); zoomTo(nz);
+    const mx=(e.touches[0].clientX+e.touches[1].clientX)/2; turnBy(-(mx-midX)*0.006); midX=mx;
+    const my=(e.touches[0].clientY+e.touches[1].clientY)/2; tiltBy((my-midY)*0.005); midY=my; }
+  else if(touchY!=null&&e.touches.length===1){ const y=e.touches[0].clientY; zoomTo(cam.dT+(touchY-y)*0.006); touchY=y; } },{passive:false});
+canvas.addEventListener('touchend',e=>{ if(e.touches.length<2) pinch0=null; },{passive:true});
+window.addEventListener('keydown',e=>{ if(window.SITE||e.target.tagName==='INPUT') return; if(e.key==='+'||e.key==='=') zoomTo(cam.dT+0.15); if(e.key==='-'||e.key==='_') zoomTo(cam.dT-0.15);
+  if(e.key.startsWith('Arrow')){ e.preventDefault(); held[e.key]=true; hideHint(); }
+  if(e.key==='0') { cam.yawT=0; cam.pitchT=0; cam.pxT=0; cam.pyT=0; zoomTo(0); } });
+window.addEventListener('keyup',e=>{ if(e.key.startsWith('Arrow')) held[e.key]=false; });
+window.addEventListener('blur',()=>{ for(const k in held) held[k]=false; });
+window.addEventListener('keydown',e=>{ if(window.SITE||e.target.tagName==='INPUT') return; if(e.key==='Escape') closeLedger(); if(e.key==='l'||e.key==='L') $('bLedger').click(); if(e.key==='p'||e.key==='P') togglePreview(); });
+window.addEventListener('resize',()=>{});
+
+setTimeout(boot,60);
+</script>
+<script src="site.js"></script>
+</body>
+</html>
