@@ -336,16 +336,16 @@ addEventListener('scroll', () => { lastScroll = performance.now(); }, { passive:
 // ---------------------------------------------------------------- pacing: how much scroll each moment of the film takes
 // [film second, weight]: heavier where there is something to read or feel, lighter through the connecting moves,
 // an exponential rush into the Sun, a hard brake on arrival. Linear between points, so the speed never jumps.
-const PACE = [[1.6, 1.5], [4.4, 1.5], [6, 0.85], [11.5, 0.85], [13, 1.45], [19.5, 1.45], [21, 0.75], [25, 0.75], [26.5, 1.35], [30.5, 1.35],
-  [32, 1.55], [39, 1.55], [41, 1.25], [44.5, 1], [47, 0.85], [50, 1.25], [59, 1.25], [60.5, 1],
-  ...[62, 63.5, 65, 66.5, 68, 69].map(t => [t, Math.exp(-0.12 * (t - 60.5))]),      // the flight: faster and faster
-  [70, 0.8], [71, 1.6], [79.5, 1.6], [81, 0.85], [83, 1.5], [91.5, 1.5], [93, 0.9], [99, 0.9], [100.5, 1.4], [112, 1.4], [114, 0.8], [117, 0.8]];
+const PACE = [[1.6, 0.9], [4.4, 0.9], [5.4, 0.32], [11.6, 0.32], [12.7, 1.0], [19.5, 1.0], [20.4, 0.28], [25.4, 0.28], [26.4, 0.95], [30.5, 0.95],
+  [31.6, 1.15], [38.5, 1.15], [40, 0.7], [44.5, 0.4], [46.2, 0.32], [49.6, 0.85], [59, 0.85], [60.3, 0.5],
+  ...[62, 63.5, 65, 66.5, 68, 69].map(t => [t, 0.5 * Math.exp(-0.14 * (t - 60.3))]),  // the flight: faster and faster
+  [70, 0.35], [71, 1.1], [79.5, 1.1], [80.6, 0.32], [82.6, 1.0], [91.5, 1.0], [92.6, 0.35], [99, 0.35], [100.2, 0.9], [109, 0.9], [111, 0.3], [117, 0.3]];
 const T0 = 1.6, PACE_N = 4000, paceT = new Float32Array(PACE_N + 1), paceS = new Float32Array(PACE_N + 1);
 { const weight = t => { for (let i = 0; i < PACE.length - 1; i++) { const [a, wa] = PACE[i], [b, wb] = PACE[i + 1]; if (t <= b) return wa + (wb - wa) * clamp((t - a) / (b - a), 0, 1); } return PACE[PACE.length - 1][1]; };
   const T1 = 116.95; let S = 0;
   for (let i = 0; i <= PACE_N; i++) { const t = T0 + (T1 - T0) * i / PACE_N; if (i) S += weight(t) * (T1 - T0) / PACE_N; paceT[i] = t; paceS[i] = S; }
   // the page is as long as the pacing needs: about a fifth of a screen per unit of weight
-  document.getElementById('track').style.height = Math.round(S * 21 + 100) + 'vh'; }
+  document.getElementById('track').style.height = Math.round(S * 13.5 + 100) + 'vh'; }
 function timeAt(f) {                    // scroll fraction -> film second, through the pacing curve
   const S = f * paceS[PACE_N]; let lo = 0, hi = PACE_N;
   while (hi - lo > 1) { const m = (lo + hi) >> 1; if (paceS[m] < S) lo = m; else hi = m; }
@@ -359,7 +359,7 @@ function frame(now) {
   wanted = Math.min(timeAt(f), dur - 0.05);        // opens on the lit chapel and title, then paced scene by scene
   // glide toward the scroll, so a flick of the wheel becomes a smooth camera move
   // a critically damped spring: the film eases into motion and settles, like a camera on a dolly
-  const w = 5.5; vel += (w * w * (wanted - shown) - 2 * w * vel) * dt; shown += vel * dt;
+  const w = 7.5; vel += (w * w * (wanted - shown) - 2 * w * vel) * dt; shown += vel * dt;
   if (Math.abs(wanted - shown) < 0.002 && Math.abs(vel) < 0.01) { shown = wanted; vel = 0; }
   if (ready && !v.seeking && Math.abs(v.currentTime - shown) > 1 / 60) { holdFrame(); v.currentTime = shown; }
   ghostA = Math.max(0, ghostA - dt * 12); ghost.style.opacity = ghostA.toFixed(3);
